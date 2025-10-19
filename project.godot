@@ -36,6 +36,7 @@ folder_colors={
 "res://GAME/assets/sprites/cards/": "orange",
 "res://GAME/assets/sprites/ui/": "orange",
 "res://GAME/assets/sprites/world/": "orange",
+"res://GAME/data/": "blue",
 "res://GAME/scenes/": "yellow",
 "res://GAME/scenes/core/": "yellow",
 "res://GAME/scenes/gameplay/": "yellow",

@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://cc607aoh18n2o"]
+[gd_scene load_steps=22 format=3 uid="uid://cc607aoh18n2o"]
 
 [ext_resource type="Script" path="res://GAME/scripts/system/pagerouter.gd" id="1_rfsmi"]
 [ext_resource type="Texture2D" uid="uid://cf3ebxbxggkyy" path="res://GAME/assets/sprites/world/1920x1080-black-solid-color-background.jpg" id="1_ubykp"]
@@ -18,6 +18,9 @@
 [ext_resource type="Texture2D" uid="uid://dfk665dtn5do3" path="res://GAME/assets/sprites/world/purple.jpg" id="12_yokv5"]
 [ext_resource type="Texture2D" uid="uid://fb36k2tlhk3q" path="res://GAME/assets/sprites/world/vUhuLn.png" id="13_1ux07"]
 [ext_resource type="Script" path="res://GAME/scripts/core/Gird_shop/boarderareamanager.gd" id="17_57wm1"]
+[ext_resource type="Script" path="res://GAME/scripts/core/Gird_shop/stackboardmanager.gd" id="17_p14qi"]
+[ext_resource type="Script" path="res://GAME/scripts/Cards_shop/Stackpile.gd" id="18_w0e72"]
+[ext_resource type="PackedScene" uid="uid://no3sefkp5w3w" path="res://GAME/scenes/cards/合成材料/普通/card_wood.tscn" id="19_hginn"]
 
 [node name="Main" type="Node2D"]
 
@@ -93,11 +96,27 @@ bottom_enabled = false
 debug_visible = true
 debug_color = Color(1, 1, 1, 0.15)
 
-[node name="GridSnap" type="Node2D" parent="PageRoot/PageRoot_Shop"]
-script = ExtResource("10_7vnr7")
-background = NodePath("../Shop_map")
-global_card_scale = 1.5
-place_incoming_below_existing = true
+[node name="StackboardRoot" type="Node2D" parent="PageRoot/PageRoot_Shop"]
+script = ExtResource("17_p14qi")
+
+[node name="Layerpiles" type="Node2D" parent="PageRoot/PageRoot_Shop/StackboardRoot"]
+
+[node name="pile_a" type="Node2D" parent="PageRoot/PageRoot_Shop/StackboardRoot/Layerpiles"]
+script = ExtResource("18_w0e72")
+
+[node name="LayerCards" type="Node2D" parent="PageRoot/PageRoot_Shop/StackboardRoot"]
+
+[node name="LayerFX" type="Node2D" parent="PageRoot/PageRoot_Shop/StackboardRoot"]
+
+[node name="DragGroup" type="Node2D" parent="PageRoot/PageRoot_Shop/StackboardRoot/LayerFX"]
+
+[node name="card_wood" parent="PageRoot/PageRoot_Shop/StackboardRoot" instance=ExtResource("19_hginn")]
+
+[node name="card_wood2" parent="PageRoot/PageRoot_Shop/StackboardRoot" instance=ExtResource("19_hginn")]
+
+[node name="card_wood3" parent="PageRoot/PageRoot_Shop/StackboardRoot" instance=ExtResource("19_hginn")]
+
+[node name="card_wood4" parent="PageRoot/PageRoot_Shop/StackboardRoot" instance=ExtResource("19_hginn")]
 
 [node name="PageRoot_Storage" type="Node2D" parent="PageRoot"]
 position = Vector2(0, 1100)
@@ -108,11 +127,6 @@ position = Vector2(6.51994, 0)
 scale = Vector2(1.00779, 1)
 texture = ExtResource("12_yokv5")
 
-[node name="GridSnap" type="Node2D" parent="PageRoot/PageRoot_Storage"]
-script = ExtResource("10_7vnr7")
-background = NodePath("../Storage_map")
-global_card_scale = 1.5
-
 [node name="PageRoot_Secret" type="Node2D" parent="PageRoot"]
 position = Vector2(1980, 1100)
 script = ExtResource("2_h4k17")
@@ -121,8 +135,3 @@ script = ExtResource("2_h4k17")
 position = Vector2(6.51994, 0)
 scale = Vector2(1.00779, 1)
 texture = ExtResource("13_1ux07")
-
-[node name="GridSnap" type="Node2D" parent="PageRoot/PageRoot_Secret"]
-script = ExtResource("10_7vnr7")
-background = NodePath("../Secret_map")
-global_card_scale = 1.5

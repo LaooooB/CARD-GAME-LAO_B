@@ -1,0 +1,13 @@
+ID     display_nametexture_path                        rarity tags
+				   res://GAME/assets/sprites/cards/1.2
+				   Poker cards/00_1.2 Poker                   Constructing
+#00001 Wood        cards.png                           Common Material
+				   res://GAME/assets/sprites/cards/1.2
+				   Poker cards/01_1.2 Poker                   Constructing
+#00002 Stone       cards.png                           Common Material
+				   res://GAME/assets/sprites/cards/1.2
+				   Poker cards/02_1.2 Poker                   Constructing
+#00003 Iron        cards.png                           Common Material
+                          Constructing
+#00100 Wood Plank   CommonMaterial
+

@@ -1,0 +1,153 @@
+[gd_scene load_steps=4 format=3 uid="uid://no3sefkp5w3w"]
+
+[ext_resource type="Texture2D" uid="uid://corkuu37f54so" path="res://GAME/assets/sprites/cards/1.2 Poker cards/00_1.2 Poker cards.png" id="1_p8m44"]
+
+[sub_resource type="GDScript" id="GDScript_io5eo"]
+script/source = "extends Node2D
+class_name Card
+
+@export var texture: Texture2D
+@export var size_px: Vector2i = Vector2i(47, 64) # 矩形碰撞盒尺寸（像素）
+@export_range(0.05, 0.45, 0.01) var visible_ratio: float = 0.15
+@export var drag_raise_z: int = 4096
+
+@onready var sprite: Sprite2D = $Sprite2D
+@onready var area: Area2D = $Area2D
+@onready var col: CollisionShape2D = $Area2D/CollisionShape2D
+
+var _dragging: bool = false
+var _drag_offset: Vector2 = Vector2.ZERO
+var _base_z: int = 0
+var _hover_target: Card = null
+
+func _ready() -> void:
+	# 贴图
+	if texture:
+		sprite.texture = texture
+	# 碰撞矩形（与可见尺寸一致）
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(size_px)
+	col.shape = shape
+
+	# 只通过 Area2D 的 input_event 启动拖拽（防误触发）
+	area.input_pickable = true
+	area.monitoring = true
+	area.monitorable = true
+	if not area.input_event.is_connected(_on_area_input_event):
+		area.input_event.connect(_on_area_input_event)
+
+	_base_z = z_index
+
+func _on_area_input_event(_viewport: Object, event: InputEvent, _shape_idx: int) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+
+	# —— 双保险：必须“确实点在我这张卡的碰撞矩形内”才允许开始拖拽 ——
+	#（即使有人误把此函数连接到别的节点，也不会误触）
+	if mb.pressed and not _dragging:
+		if not _is_point_inside_collision(mb.position):
+			return
+		_start_drag(mb.position)
+	elif (not mb.pressed) and _dragging:
+		_end_drag_and_maybe_snap()
+
+func _is_point_inside_collision(global_point: Vector2) -> bool:
+	# 将全局点转为本地，按我们的矩形碰撞进行判定
+	var shape := col.shape as RectangleShape2D
+	if shape == null:
+		return false
+	var half := shape.size * 0.5
+	# Area2D 的碰撞中心在 area.position（局部），把全局点转为局部再减去中心
+	var local_from_global: Vector2 = to_local(global_point) - area.position
+	return abs(local_from_global.x) <= half.x and abs(local_from_global.y) <= half.y
+
+func _start_drag(global_mouse_pos: Vector2) -> void:
+	_dragging = true
+	var mouse: Vector2 = global_mouse_pos
+	_drag_offset = mouse - global_position
+	z_index = _base_z + drag_raise_z
+	_hover_target = null
+	set_process(true)
+
+func _process(_delta: float) -> void:
+	if not _dragging:
+		set_process(false)
+		return
+	var mouse: Vector2 = get_viewport().get_mouse_position()
+	global_position = mouse - _drag_offset
+
+	_hover_target = _pick_best_overlap_target()
+
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_end_drag_and_maybe_snap()
+
+func _end_drag_and_maybe_snap() -> void:
+	_dragging = false
+	if _hover_target != null and _hover_target != self:
+		_snap_on_top_of(_hover_target)
+	_hover_target = null
+	z_index = _base_z
+	set_process(false)
+
+func _pick_best_overlap_target() -> Card:
+	var best: Card = null
+	var best_score: float = 0.0
+	var overlaps: Array[Area2D] = area.get_overlapping_areas()
+	for a in overlaps:
+		if a == area:
+			continue
+		var other_card := a.get_parent() as Card
+		if other_card == null or other_card == self:
+			continue
+		var score := _overlap_ratio_with(other_card)
+		if score > best_score:
+			best_score = score
+			best = other_card
+	if best_score < 0.05:
+		return null
+	return best
+
+func _overlap_ratio_with(other: Card) -> float:
+	var my_rect: Rect2 = _global_rect_from_collision()
+	var other_rect: Rect2 = other._global_rect_from_collision()
+	var inter := my_rect.intersection(other_rect)
+	if inter.size.x <= 0.0 or inter.size.y <= 0.0:
+		return 0.0
+	var area_i := inter.size.x * inter.size.y
+	var area_a := my_rect.size.x * my_rect.size.y
+	var area_b := other_rect.size.x * other_rect.size.y
+	return area_i / max(1.0, min(area_a, area_b))
+
+func _global_rect_from_collision() -> Rect2:
+	var shape := col.shape as RectangleShape2D
+	if shape == null:
+		return Rect2(global_position, Vector2.ONE)
+	var half: Vector2 = shape.size * 0.5
+	var center: Vector2 = to_global(area.position)
+	return Rect2(center - half, shape.size)
+
+func _snap_on_top_of(base_card: Card) -> void:
+	var h: float = float(size_px.y)
+	var step: float = h * (1.0 - visible_ratio) # 覆盖 85%，露出 15%
+	global_position = base_card.global_position + Vector2(0.0, -step)
+	_base_z = max(_base_z, base_card.z_index + 1)
+	z_index = _base_z
+"
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_aa87d"]
+size = Vector2(46, 62)
+
+[node name="card_wood" type="Node2D"]
+script = SubResource("GDScript_io5eo")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_p8m44")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectangleShape2D_aa87d")
+debug_color = Color(0.69703, 0.421901, 0.676464, 0.42)

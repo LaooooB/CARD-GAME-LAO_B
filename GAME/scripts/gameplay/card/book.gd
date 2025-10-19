@@ -40,80 +40,74 @@ func _ready() -> void:
 	area.input_event.connect(_on_area_input_event)
 	set_process_input(true)
 
-# ========== 唯一版本：点击开始拖拽（兼容牌眉/组拖/单卡） ==========
+# 点击开始拖拽（支持：点中间牌眉 → 选它+上方所有牌）
 func _on_area_input_event(_vp, event: InputEvent, _shape_idx: int) -> void:
-	if not (event is InputEventMouseButton): return
-	var mb := event as InputEventMouseButton
-	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed: return
+	if not (event is InputEventMouseButton):
+		return
+	var mb: InputEventMouseButton = event
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
 
-	# 1) 找到 GridSnapManager（优先路由单例，其次组标签）
+	# 1) 找“谁来判定命中 & 组拖”
+	var reg: Node = get_node_or_null("/root/SnapRegistry")
 	var gm: Node = null
-	var reg: Node = get_node_or_null("/root/SnapRegistry") # 若你有 Autoload 的路由器
-	if reg != null:
-		gm = reg
-	else:
-		gm = get_tree().get_first_node_in_group("snap_manager")
+	if reg == null:
+		var managers := get_tree().get_nodes_in_group("snap_manager")
+		if managers.size() > 0:
+			gm = managers[0]
 
-	# 2) can_drag 审核（若管理器提供）
-	if gm != null and gm.has_method("can_drag"):
-		# 注意：此处先按“点到我自己”试一把，后续若 pick 到子堆头会重新判一次 begin_group_drag
-		if not gm.can_drag(self):
-			return
-
-	# 3) 通过管理器“点拾”命中顶牌/牌眉子堆头；若没有管理器或未实现，fallback 为自己
+	# 2) 让 Manager 判定“到底点中了哪张牌”
 	var mouse_pos: Vector2 = get_global_mouse_position()
 	var picked: Node2D = null
-	if gm != null and gm.has_method("pick_card_at"):
+
+	if reg != null and reg.has_method("pick_card_at"):
+		picked = reg.pick_card_at(mouse_pos)
+	elif gm != null and gm.has_method("pick_card_at"):
 		picked = gm.pick_card_at(mouse_pos)
+
 	if picked == null:
 		picked = self
 
-	# 4) 记录拖拽目标与起点
+	# 3) 设定拖拽目标
 	drag_target = picked
 	_pre_drag_pos = drag_target.global_position
 
-	# 5) 组装子堆并尝试进入组拖状态（如果 gm 支持）
-	if gm != null and gm.has_method("prepare_drag_group"):
+	# 4) 交给 Manager 组装“它 + 上方所有牌”为子堆，并尝试进入组拖
+	if reg != null and reg.has_method("prepare_drag_group"):
+		reg.prepare_drag_group(drag_target, mouse_pos)
+	elif gm != null and gm.has_method("prepare_drag_group"):
 		gm.prepare_drag_group(drag_target, mouse_pos)
-	if gm != null and gm.has_method("begin_group_drag"):
+
+	if reg != null and reg.has_method("begin_group_drag"):
+		reg.begin_group_drag(drag_target)
+	elif gm != null and gm.has_method("begin_group_drag"):
 		gm.begin_group_drag(drag_target)
 
-	# 6) 偏移用于平滑跟随
-	drag_offset = drag_target.global_position - mouse_pos
+	# 5) 判断是否已进入“组拖”
+	var group_active: bool = false
+	if reg != null and reg.has_method("is_group_active_for"):
+		group_active = reg.is_group_active_for(drag_target)
+	elif gm != null and gm.has_method("is_group_active_for"):
+		group_active = gm.is_group_active_for(drag_target)
 
-	# 7) 判断是否进入了组拖（组拖则由管理器统一提层/排序；否则本地处理“单卡临时提层”）
-	var is_group_active: bool = (gm != null and gm.has_method("is_group_active_for") and gm.is_group_active_for(drag_target))
-	_scaled_card = null
-	_used_drag_layer = false
-
-	if not is_group_active:
-		# 记录还原信息（只针对 drag_target 单卡）
-		_pre_drag_z = drag_target.z_index
-		_pre_drag_z_as_relative = drag_target.z_as_relative
-		_pre_drag_top_level = drag_target.top_level
+	if not group_active:
+		# —— 单卡拖拽视觉（组拖不走这套）——
 		_pre_drag_parent = drag_target.get_parent()
 		_pre_drag_sibling = drag_target.get_index()
 
-		# 优先拖到 DragLayer
-		var drag_layer: CanvasLayer = _get_drag_layer()
-		if drag_layer != null:
-			var gp: Vector2 = drag_target.global_position
-			drag_target.reparent(drag_layer)
-			drag_target.global_position = gp
-			_used_drag_layer = true
-		else:
-			var gp2: Vector2 = drag_target.global_position
-			drag_target.top_level = true
-			drag_target.global_position = gp2
+		var gp: Vector2 = drag_target.global_position
+		drag_target.top_level = true
+		drag_target.global_position = gp
 
 		drag_target.z_as_relative = false
 		drag_target.z_index = DRAG_Z
-
-		# 选中态微缩放（单卡）
 		_scaled_card = drag_target
 		_scaled_card.scale = base_scale * 1.04
 
+	# 6) 记录拖拽偏移，进入拖拽态
+	drag_offset = drag_target.global_position - mouse_pos
 	dragging = true
+
 
 func _input(event: InputEvent) -> void:
 	if not dragging: return
@@ -198,3 +192,5 @@ static func rarity_to_string(idx: int) -> String:
 
 func get_rarity_name() -> String:
 	return Book.rarity_to_string(rarity)
+	
+	

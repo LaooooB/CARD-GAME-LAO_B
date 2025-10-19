@@ -1,6 +1,6 @@
 extends Node
 # 不用 class_name，避免全局名冲突
-
+class_name AnimationOrchestrator
 # —— 统一动画参数（可在 Inspector 调）——
 # 吸附（新卡/重排到位）
 @export var snap_enabled: bool = true
