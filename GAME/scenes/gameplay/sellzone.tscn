@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3 uid="uid://dj4o5x5ax1at1"]
+
+[ext_resource type="Script" path="res://GAME/scripts/gameplay/sellzone.gd" id="1_3y2hh"]
+[ext_resource type="Texture2D" uid="uid://dp2a6qmglld51" path="res://GAME/assets/sprites/gameplay/coine.jpg" id="2_ibi6d"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_580l3"]
+size = Vector2(234, 212)
+
+[node name="sellzone" type="Node2D"]
+script = ExtResource("1_3y2hh")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_ibi6d")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectangleShape2D_580l3")

@@ -1,0 +1,429 @@
+[gd_scene load_steps=2 format=3 uid="uid://giay4gsaww7"]
+
+[sub_resource type="GDScript" id="GDScript_vmt4f"]
+script/source = "extends Node2D
+class_name StackManager
+
+# ====== 交互/视觉参数 ======
+@export_range(0.1, 1.0, 0.01) var overlap_ratio_threshold := 0.28  # 卡对卡吸附的重叠比例阈值
+@export var visible_ratio := 0.15                                   # 堆内层的可见比例（向下偏移）
+@export var card_pixel_size := Vector2(47, 64)
+@export_range(0.1, 3.0, 0.05) var global_card_scale := 0.5
+
+@export var gap_x := 8.0   # 列间距（用于估算列数）
+@export var gap_y := 8.0   # 竖向最小间距（tidy 用）
+
+# 背景区域（计算 lanes 用，与 Grid 版一致）
+@export var background: NodePath
+@export_range(0.0, 0.45, 0.01) var edge_exclude_ratio := 0.10
+@export var margin_left := 0.0
+@export var margin_right := 0.0
+@export var margin_top := 0.0
+@export var margin_bottom := 0.0
+
+# 动画
+@export var snap_anim_enabled := true
+@export_range(0.05, 0.6, 0.01) var snap_anim_duration := 0.12
+@export var snap_anim_transition: Tween.TransitionType = Tween.TRANS_QUAD
+@export var snap_anim_ease: Tween.EaseType = Tween.EASE_OUT
+
+@export var lane_snap_anim_enabled := true
+@export_range(0.05, 0.6, 0.01) var lane_snap_duration := 0.10
+
+@export var tidy_anim_enabled := true
+@export_range(0.05, 0.8, 0.01) var tidy_anim_duration := 0.15
+
+# ====== 内部状态 ======
+var _bg_sprite: Sprite2D = null
+var _active_tweens: Dictionary = {}     # Node2D -> Tween
+
+# 堆：sid -> Array[Node2D]（自下而上）
+var _stacks: Dictionary = {}            # int -> Array
+# 每个堆记录它所在列（lane 索引）
+var _stack_lane: Dictionary = {}        # int -> int
+# 列中心线（随背景/参数动态计算）
+var _lane_x: Array = []                 # Array[float]
+
+func _ready() -> void:
+	add_to_group(\"stack_manager\")
+	if background != NodePath():
+		_bg_sprite = get_node_or_null(background)
+	_rebuild_lanes()
+
+# ====== Book 调用：只有堆顶可拖 ======
+func can_drag(card: Node2D) -> bool:
+	var sid := _get_stack_id(card)
+	if sid == 0:
+		return true
+	if not _stacks.has(sid):
+		return true
+	var arr: Array = _stacks[sid]
+	return (not arr.is_empty() and arr.back() == card)
+
+# ====== Book 调用：尝试吸附（卡对卡）+ 自由落下的列吸附 + 轻量 Tidy ======
+func try_snap_card(card: Node2D, original_pos: Vector2) -> bool:
+	_rebuild_lanes()
+
+	# 先找最优目标卡
+	var target: Node2D = _find_best_target(card)
+	if target != null:
+		var target_sid := _get_stack_id(target)
+		if target_sid == 0:
+			_new_stack_with(target, card)    # 新建堆：底=target，上=card
+		else:
+			_push_onto_stack(target_sid, card) # 加到现有堆顶
+		# 入堆后：堆内排版完成，保持列不变（由对方堆的列决定）
+		var sid_after := _get_stack_id(card)
+		_tidy_lane_for_stack(sid_after)      # 轻量整理该列
+		return true
+
+	# 未命中任何卡：自由落下 → 以该卡为新堆顶创建堆
+	_remove_from_stack_if_any(card)
+	var sid := _new_stack_single(card)
+
+	# 列吸附（X 对齐最近 lane，中间不改变列数顺序）
+	var head_pos := card.global_position
+	var li := _nearest_lane_index(head_pos.x)
+	_stack_lane[sid] = li
+	var snapped_x := (_lane_x[li] if _lane_x.size() > 0 else head_pos.x)
+	var target_pos := Vector2(snapped_x, head_pos.y)
+	_tween_to(card, target_pos, lane_snap_duration if lane_snap_anim_enabled else 0.0)
+
+	# 以“堆顶为锚点”重新排版堆（这里只有一张卡，其实就是定位堆顶）
+	_layout_stack(sid, null)
+
+	# 列内 tidy（只向下推，保持整齐）
+	_tidy_lane(li)
+	return true
+
+# ------------------ 目标选择（卡对卡吸附） ------------------
+func _find_best_target(card: Node2D) -> Node2D:
+	var my_rect := _card_rect(card)
+	var best: Node2D = null
+	var best_score := -1.0
+	var my_area := my_rect.size.x * my_rect.size.y
+	if my_area <= 0.0:
+		return null
+
+	for n in get_tree().get_nodes_in_group(\"cards\"):
+		var other := n as Node2D
+		if other == null or other == card:
+			continue
+		var r := _card_rect(other)
+		var inter := my_rect.intersection(r)
+		if inter.size.x <= 0 or inter.size.y <= 0:
+			continue
+		var overlap := inter.size.x * inter.size.y
+		var ratio := overlap / my_area
+		if ratio < overlap_ratio_threshold:
+			continue
+		# 分数：重叠越大越好，若相等，z 更高优先（你看到的那张）
+		var score := ratio * 10000.0 + float(_get_z(other))
+		if score > best_score:
+			best_score = score
+			best = other
+	return best
+
+# ------------------ 新建堆/入堆（堆顶作为锚点） ------------------
+func _new_stack_with(bottom: Node2D, top: Node2D) -> void:
+	_remove_from_stack_if_any(bottom)
+	_remove_from_stack_if_any(top)
+
+	# 采用 “堆顶作为锚点”，所以新堆的锚点 = top 当前坐标
+	var sid := bottom.get_instance_id()
+	_stacks[sid] = [bottom, top]
+	_set_stack_meta(bottom, sid, 0)
+	_set_stack_meta(top, sid, 1)
+
+	# 列：沿用 bottom 的列（若它有），否则按 top 坐标最近 lane
+	var li := _stack_lane.get(sid, -1)
+	if li == -1:
+		li = _nearest_lane_index(top.global_position.x)
+	_stack_lane[sid] = li
+
+	_layout_stack(sid, top)
+	_tidy_lane(li)
+
+func _push_onto_stack(sid: int, card: Node2D) -> void:
+	_remove_from_stack_if_any(card)
+	var arr: Array = _stacks.get(sid, [])
+	arr.append(card)                            # 压到堆顶
+	_stacks[sid] = arr
+	_set_stack_meta(card, sid, arr.size() - 1)
+
+	# 堆顶锚点 = 旧堆顶的坐标 → 新 card tween 到堆顶位置
+	_layout_stack(sid, card)
+
+	# 继承该堆所在列并 tidy
+	var li := _stack_lane.get(sid, _nearest_lane_index(card.global_position.x))
+	_stack_lane[sid] = li
+	_tidy_lane(li)
+
+func _new_stack_single(card: Node2D) -> int:
+	var sid := card.get_instance_id()
+	_stacks[sid] = [card]
+	_set_stack_meta(card, sid, 0)
+	# 先不指定列，等会根据最近 lane 指定
+	return sid
+
+# ------------------ 从堆移除 & 回收空堆 ------------------
+func _remove_from_stack_if_any(card: Node2D) -> void:
+	var sid := _get_stack_id(card)
+	if sid == 0:
+		return
+	if not _stacks.has(sid):
+		_clear_stack_meta(card)
+		return
+
+	var arr: Array = _stacks[sid]
+	var idx := arr.find(card)
+	if idx != -1:
+		arr.remove_at(idx)
+		# 更新其余牌的 index
+		for i in range(idx, arr.size()):
+			_set_stack_meta(arr[i], sid, i)
+
+	# 空堆/单牌 → 释放该堆
+	if arr.size() <= 1:
+		if arr.size() == 1:
+			_clear_stack_meta(arr[0])
+		_stacks.erase(sid)
+		_stack_lane.erase(sid)
+	else:
+		_stacks[sid] = arr
+		# 移除后重新排版该堆（锚点保持在“新堆顶”的当前位置）
+		_layout_stack(sid, null)
+
+	_clear_stack_meta(card)
+
+# ------------------ 堆布局（堆顶为锚点） ------------------
+func _layout_stack(sid: int, animate_card: Node2D) -> void:
+	if not _stacks.has(sid):
+		return
+	var arr: Array = _stacks[sid]
+	if arr.is_empty():
+		return
+
+	# 堆顶 = arr.back()；以堆顶为锚点
+	var top_card: Node2D = arr.back()
+	var head_pos := top_card.global_position
+
+	var cell := card_pixel_size * global_card_scale
+	var offset := Vector2(0, cell.y * visible_ratio)
+	var n := arr.size()
+
+	for i in range(n):
+		var c: Node2D = arr[i]        # 自下而上
+		var delta_layers := n - 1 - i # bottom 距离 top 的层数
+		var target := head_pos + offset * float(delta_layers)
+		c.z_index = i                 # 简单保证堆内次序
+		if animate_card != null and c == animate_card and snap_anim_enabled:
+			_tween_to(c, target, snap_anim_duration)
+		else:
+			c.global_position = target
+
+# ------------------ 列计算 / 列吸附 / 整理 ------------------
+func _rebuild_lanes() -> void:
+	var rect := _board_rect()
+	_lane_x.clear()
+	var cell := card_pixel_size * global_card_scale
+	var pitch_x := cell.x + gap_x
+	if rect.size.x <= 0.0 or pitch_x <= 0.0:
+		return
+
+	# 估算列数（和 Grid 逻辑一致）
+	var cols := int(floor((rect.size.x + gap_x) / pitch_x))
+	if cols <= 0:
+		return
+	for x in range(cols):
+		var cx := rect.position.x + float(x) * pitch_x + pitch_x * 0.5
+		_lane_x.append(cx)
+
+func _nearest_lane_index(xv: float) -> int:
+	if _lane_x.is_empty():
+		return 0
+	var best_idx := 0
+	var best_dist := abs(xv - float(_lane_x[0]))
+	for i in range(1, _lane_x.size()):
+		var d := abs(xv - float(_lane_x[i]))
+		if d < best_dist:
+			best_dist = d
+			best_idx = i
+	return best_idx
+
+# 只整理“sid 对应的那一列”（在入堆/自由落后调用）
+func _tidy_lane_for_stack(sid: int) -> void:
+	if not _stack_lane.has(sid):
+		return
+	var li := int(_stack_lane[sid])
+	_tidy_lane(li)
+
+# 整理一列：按 head Y 升序，逐个向下推，保持 gap_y 间距
+func _tidy_lane(li: int) -> void:
+	if _lane_x.is_empty():
+		return
+	var lane_center := float(_lane_x[li])
+
+	# 收集该列的堆（head 的 x 吸附到该列）
+	var items: Array = []   # [ [sid, head_pos_y, head_card] ... ]
+	for sid_key in _stacks.keys():
+		var sid := int(sid_key)
+		if _stack_lane.get(sid, -1) != li:
+			continue
+		var arr: Array = _stacks[sid]
+		if arr.is_empty():
+			continue
+		var head := arr.back() as Node2D
+		items.append([sid, head.global_position.y, head])
+
+	# 按 y 升序
+	items.sort_custom(func(a, b):
+		return a[1] < b[1]
+	)
+
+	# 逐个向下推
+	var prev_bottom := -INF
+	var cell := card_pixel_size * global_card_scale
+	for item in items:
+		var sid := int(item[0])
+		var head_card := item[2] as Node2D
+		var head := head_card.global_position
+
+		# 计算该堆的高度（从 head 顶到堆底）
+		var arr: Array = _stacks[sid]
+		var layers := arr.size()
+		var total_h := cell.y + float(layers - 1) * (cell.y * visible_ratio)
+
+		# 理想的 head 顶边（rect top）
+		var head_top := head.y - cell.y * 0.5
+		var min_top := prev_bottom + gap_y
+		if head_top < min_top:
+			# 需要向下推：新的 head y = min_top + cell.y/2
+			var new_head_y := min_top + cell.y * 0.5
+			var new_head := Vector2(lane_center, new_head_y)
+			# 先把堆顶 tween 到新位置，再整体重排堆
+			_tween_to(head_card, new_head, tidy_anim_duration if tidy_anim_enabled else 0.0)
+			_layout_stack(sid, null)
+			head_top = new_head_y - cell.y * 0.5
+		else:
+			# 只修 X 到列中心
+			var fixed_x := Vector2(lane_center, head.y)
+			_tween_to(head_card, fixed_x, lane_snap_duration if lane_snap_anim_enabled else 0.0)
+			_layout_stack(sid, null)
+
+		# 该堆底边
+		var head_bottom := head_top + total_h
+		prev_bottom = head_bottom
+
+# ------------------ 小工具：AABB/Rect/堆高 ------------------
+func _card_rect(card: Node2D) -> Rect2:
+	var spr := card.get_node_or_null(\"Sprite2D\") as Sprite2D
+	if spr == null or spr.texture == null:
+		return Rect2(card.global_position - Vector2(24, 32), Vector2(48, 64))
+	var size: Vector2 = spr.texture.get_size() * card.global_scale
+	var tl := card.global_position - size * 0.5
+	return Rect2(tl, size)
+
+func _get_z(card: Node2D) -> int:
+	return (card as CanvasItem).z_index
+
+func _get_stack_id(card: Node2D) -> int:
+	if card.has_meta(\"stack_id\"):
+		var v := card.get_meta(\"stack_id\")
+		if typeof(v) == TYPE_INT:
+			return int(v)
+	return 0
+
+func _set_stack_meta(card: Node2D, sid: int, idx: int) -> void:
+	card.set_meta(\"stack_id\", sid)
+	card.set_meta(\"stack_index\", idx)
+
+func _clear_stack_meta(card: Node2D) -> void:
+	card.set_meta(\"stack_id\", null)
+	card.set_meta(\"stack_index\", null)
+
+# 背景矩形（与 Grid 版一致）
+func _board_rect() -> Rect2:
+	var rect := _background_rect()
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return Rect2()
+
+	var inset_x := rect.size.x * edge_exclude_ratio
+	var inset_y := rect.size.y * edge_exclude_ratio
+	var pos := rect.position + Vector2(inset_x, inset_y)
+	var size := rect.size - Vector2(inset_x * 2.0, inset_y * 2.0)
+	pos.x += margin_left
+	pos.y += margin_top
+	size.x -= (margin_left + margin_right)
+	size.y -= (margin_top + margin_bottom)
+	if size.x < 0.0:
+		size.x = 0.0
+	if size.y < 0.0:
+		size.y = 0.0
+	return Rect2(pos, size)
+
+func _background_rect() -> Rect2:
+	if _bg_sprite != null and _bg_sprite.texture != null:
+		var tex_size: Vector2 = _bg_sprite.texture.get_size()
+		var scl: Vector2 = _bg_sprite.scale.abs()
+		var size: Vector2 = tex_size * scl
+		var top_left: Vector2 = _bg_sprite.global_position
+		if _bg_sprite.centered:
+			top_left -= size * 0.5
+		top_left -= _bg_sprite.offset * scl
+		return Rect2(top_left, size)
+	# 兜底：1920x1080，居中
+	var size_fallback: Vector2 = Vector2(1920, 1080)
+	var top_left_fallback: Vector2 = -size_fallback * 0.5
+	return Rect2(top_left_fallback, size_fallback)
+
+# Tween 帮助
+func _tween_to(card: Node2D, target: Vector2, dur: float) -> void:
+	if dur <= 0.0:
+		card.global_position = target
+		return
+	card.set_meta(\"is_snapping\", true)
+	if _active_tweens.has(card):
+		var old: Tween = _active_tweens[card]
+		if is_instance_valid(old):
+			old.kill()
+		_active_tweens.erase(card)
+	var t := create_tween()
+	_active_tweens[card] = t
+	t.set_trans(snap_anim_transition).set_ease(snap_anim_ease)
+	t.tween_property(card, \"global_position\", target, dur)
+	t.finished.connect(func():
+		if _active_tweens.has(card):
+			_active_tweens.erase(card)
+		card.set_meta(\"is_snapping\", false))
+"
+
+[node name="Stackmanager" type="Node2D"]
+script = SubResource("GDScript_vmt4f")
+background = null
+edge_exclude_ratio = null
+margin_left = null
+margin_right = null
+margin_top = null
+margin_bottom = null
+card_pixel_size = null
+global_card_scale = null
+gap_x = null
+gap_y = null
+visible_ratio = null
+max_stack_size = null
+debug_show_grid = null
+debug_line_alpha = null
+debug_show_blocked = null
+snap_anim_enabled = null
+snap_anim_duration = null
+snap_anim_transition = null
+snap_anim_ease = null
+return_anim_enabled = null
+return_anim_duration = null
+return_anim_transition = null
+return_anim_ease = null
+shift_anim_enabled = null
+shift_anim_duration = null
+shift_anim_transition = null
+shift_anim_ease = null

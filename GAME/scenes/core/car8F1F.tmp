@@ -1,0 +1,19 @@
+[gd_scene load_steps=4 format=3 uid="uid://bof858bddchsd"]
+
+[ext_resource type="Script" path="res://GAME/scripts/core/cardbase.gd" id="1_5kkyt"]
+[ext_resource type="Texture2D" uid="uid://xs6u5jdiikoj" path="res://GAME/assets/sprites/cards/Book.png" id="2_5j5ru"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_pfbvy"]
+
+[node name="Cardbase" type="Node2D"]
+script = ExtResource("1_5kkyt")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_5j5ru")
+script = ExtResource("1_5kkyt")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+scale = Vector2(25, 25)
+shape = SubResource("RectangleShape2D_pfbvy")

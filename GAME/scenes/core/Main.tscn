@@ -1,0 +1,113 @@
+[gd_scene load_steps=19 format=3 uid="uid://cc607aoh18n2o"]
+
+[ext_resource type="Script" path="res://GAME/scripts/system/pagerouter.gd" id="1_rfsmi"]
+[ext_resource type="Texture2D" uid="uid://cf3ebxbxggkyy" path="res://GAME/assets/sprites/world/1920x1080-black-solid-color-background.jpg" id="1_ubykp"]
+[ext_resource type="Script" path="res://GAME/scripts/core/cardspawner.gd" id="2_8agnm"]
+[ext_resource type="Script" path="res://GAME/scripts/system/pageroot.gd" id="2_h4k17"]
+[ext_resource type="Script" path="res://GAME/scripts/core/gridsnaprouter.gd" id="2_uarqj"]
+[ext_resource type="PackedScene" uid="uid://di27k65n1m2ym" path="res://GAME/scenes/gameplay/cards/book.tscn" id="3_1cead"]
+[ext_resource type="PackedScene" uid="uid://dj4o5x5ax1at1" path="res://GAME/scenes/gameplay/sellzone.tscn" id="3_ph0mo"]
+[ext_resource type="Script" path="res://GAME/scripts/core/AnimationOrchestrator.gd" id="4_7hyqo"]
+[ext_resource type="Texture2D" uid="uid://corkuu37f54so" path="res://GAME/assets/sprites/cards/1.2 Poker cards/00_1.2 Poker cards.png" id="4_a8j81"]
+[ext_resource type="Texture2D" uid="uid://b0id1om36773p" path="res://GAME/assets/sprites/cards/1.2 Poker cards/01_1.2 Poker cards.png" id="5_ffy0b"]
+[ext_resource type="Texture2D" uid="uid://b6wnhnl3dv63r" path="res://GAME/assets/sprites/cards/1.2 Poker cards/02_1.2 Poker cards.png" id="6_ihjgg"]
+[ext_resource type="Texture2D" uid="uid://16r0odsj8i54" path="res://GAME/assets/sprites/cards/1.2 Poker cards/40_1.2 Poker cards.png" id="7_iww6x"]
+[ext_resource type="Texture2D" uid="uid://dbgirhkfj1g6f" path="res://GAME/assets/sprites/cards/1.2 Poker cards/41_1.2 Poker cards.png" id="8_4hfpj"]
+[ext_resource type="Texture2D" uid="uid://ds7nq0pqk7bhk" path="res://GAME/assets/sprites/cards/1.2 Poker cards/42_1.2 Poker cards.png" id="9_335eg"]
+[ext_resource type="Script" path="res://GAME/scripts/core/gridsnapmanager.gd" id="10_7vnr7"]
+[ext_resource type="Texture2D" uid="uid://c0nqvqb5u58ct" path="res://GAME/assets/sprites/world/blue.png" id="11_ddbls"]
+[ext_resource type="Texture2D" uid="uid://dfk665dtn5do3" path="res://GAME/assets/sprites/world/purple.jpg" id="12_yokv5"]
+[ext_resource type="Texture2D" uid="uid://fb36k2tlhk3q" path="res://GAME/assets/sprites/world/vUhuLn.png" id="13_1ux07"]
+
+[node name="Main" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(13, 0)
+
+[node name="System" type="Node" parent="."]
+
+[node name="Page_Router" type="Node" parent="System"]
+script = ExtResource("1_rfsmi")
+camera_path = NodePath("../../Camera2D")
+page_main_root = NodePath("../../PageRoot/PageRoot_Main")
+page_shop_root = NodePath("../../PageRoot/PageRoot_Shop")
+page_storage_root = NodePath("../../PageRoot/PageRoot_Storage")
+page_secret_root = NodePath("../../PageRoot/PageRoot_Secret")
+tween_duration = 0.17
+tween_transition = 7
+tween_ease = 1
+
+[node name="GridSnapRouter" type="Node" parent="System"]
+script = ExtResource("2_uarqj")
+
+[node name="Mechanics" type="Node" parent="System"]
+
+[node name="Sellingzone" parent="System/Mechanics" instance=ExtResource("3_ph0mo")]
+light_mask = 16
+visibility_layer = 16
+position = Vector2(813, -402)
+
+[node name="AnimationOrchestrator" type="Node" parent="System/Mechanics"]
+script = ExtResource("4_7hyqo")
+snap_duration = 1.0
+return_duration = 1.0
+shift_duration = 1.2
+
+[node name="UI" type="Node2D" parent="."]
+
+[node name="PageRoot" type="Node2D" parent="."]
+
+[node name="PageRoot_Main" type="Node2D" parent="PageRoot"]
+script = ExtResource("2_h4k17")
+
+[node name="black" type="Sprite2D" parent="PageRoot/PageRoot_Main"]
+scale = Vector2(1.00779, 1)
+texture = ExtResource("1_ubykp")
+
+[node name="CardSpawner" type="Node2D" parent="PageRoot/PageRoot_Main"]
+script = ExtResource("2_8agnm")
+card_scene = ExtResource("3_1cead")
+card_textures = Array[Texture2D]([ExtResource("4_a8j81"), ExtResource("5_ffy0b"), ExtResource("6_ihjgg"), ExtResource("7_iww6x"), ExtResource("8_4hfpj"), ExtResource("9_335eg"), ExtResource("4_a8j81"), ExtResource("4_a8j81"), ExtResource("4_a8j81")])
+gap = Vector2(20, 20)
+card_scale = 1.5
+
+[node name="GridSnap" type="Node2D" parent="PageRoot/PageRoot_Main"]
+script = ExtResource("10_7vnr7")
+global_card_scale = 1.5
+place_incoming_below_existing = true
+
+[node name="PageRoot_Shop" type="Node2D" parent="PageRoot"]
+position = Vector2(1980, 0)
+script = ExtResource("2_h4k17")
+
+[node name="Shop_map" type="Sprite2D" parent="PageRoot/PageRoot_Shop"]
+position = Vector2(6.51994, 0)
+scale = Vector2(1.00779, 1)
+texture = ExtResource("11_ddbls")
+
+[node name="CardSpawner" type="Node2D" parent="PageRoot/PageRoot_Shop"]
+position = Vector2(6.5199, 0)
+scale = Vector2(1.00779, 1)
+script = ExtResource("2_8agnm")
+card_scene = ExtResource("3_1cead")
+card_textures = Array[Texture2D]([ExtResource("4_a8j81"), ExtResource("5_ffy0b"), ExtResource("6_ihjgg"), ExtResource("7_iww6x"), ExtResource("8_4hfpj"), ExtResource("9_335eg"), ExtResource("4_a8j81"), ExtResource("4_a8j81"), ExtResource("4_a8j81")])
+gap = Vector2(20, 20)
+card_scale = 1.5
+
+[node name="PageRoot_Storage" type="Node2D" parent="PageRoot"]
+position = Vector2(0, 1100)
+script = ExtResource("2_h4k17")
+
+[node name="Storage_map" type="Sprite2D" parent="PageRoot/PageRoot_Storage"]
+position = Vector2(6.51994, 0)
+scale = Vector2(1.00779, 1)
+texture = ExtResource("12_yokv5")
+
+[node name="PageRoot_Secret" type="Node2D" parent="PageRoot"]
+position = Vector2(1980, 1100)
+script = ExtResource("2_h4k17")
+
+[node name="Secret_map" type="Sprite2D" parent="PageRoot/PageRoot_Secret"]
+position = Vector2(6.51994, 0)
+scale = Vector2(1.00779, 1)
+texture = ExtResource("13_1ux07")
