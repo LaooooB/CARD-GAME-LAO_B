@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3 uid="uid://2wlrb5cf7tti"]
+
+[ext_resource type="Script" path="res://GAME/scripts/core/Grid_Storage/grid_manager.gd" id="1_7bcu6"]
+[ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/core/pile.tscn" id="2_t8eps"]
+
+[node name="GridManager" type="Node2D"]
+script = ExtResource("1_7bcu6")
+pile_scene = ExtResource("2_t8eps")
