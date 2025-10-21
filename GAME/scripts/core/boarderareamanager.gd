@@ -2,6 +2,7 @@ extends Node2D
 class_name BorderAreaManager
 
 # —— 可调参数（全局）——
+
 @export_range(0.0, 512.0, 1.0) var border_thickness: float = 64.0        # 全局默认粗细
 @export var top_enabled: bool = true
 @export var right_enabled: bool = true

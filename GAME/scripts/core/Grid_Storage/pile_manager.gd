@@ -45,21 +45,32 @@ func _ready() -> void:
 
 # ---------- 基础接口 ----------
 func add_card(card: Card) -> void:
+	# —— 关键：保留并恢复全局坐标，避免 reparent 瞬移 ——
+	var gp: Vector2 = card.global_position
+
 	if card.get_parent() != null:
 		card.get_parent().remove_child(card)
 	add_child(card)
+
+	# 恢复世界坐标，使动画从“手上松开的位置”开始
+	card.global_position = gp
+
 	card.set_pile(self)
 	_cards.append(card)
 	_reflow_after_change()
 
+
 func add_cards(cards: Array[Card]) -> void:
 	for c: Card in cards:
+		var gp: Vector2 = c.global_position  # —— 每张都保存全局坐标 ——
 		if c.get_parent() != null:
 			c.get_parent().remove_child(c)
 		add_child(c)
+		c.global_position = gp               # —— reparent 后恢复全局坐标 ——
 		c.set_pile(self)
 		_cards.append(c)
 	_reflow_after_change()
+
 
 func get_cards() -> Array[Card]:
 	return _cards.duplicate()
@@ -106,11 +117,19 @@ func _set_card_layer(card: Card, z: int) -> void:
 
 func _move_card(card: Card, local_pos: Vector2) -> void:
 	var target_global: Vector2 = to_global(local_pos)
-	var anim: Node = card.get_node_or_null(^"CardAnimation")
+
+	# ① 优先用 CardAnimation（递归找，兼容你在 Card.gd 的用法）
+	var anim: Node = card.find_child("CardAnimation", true, false)
 	if anim != null and anim.has_method("tween_to"):
 		anim.call("tween_to", target_global, 0.12, 1.0, card.z_index)
-	else:
-		card.global_position = target_global
+		return
+
+	# ② 兜底：不用 CardAnimation，直接在本脚本节点上给 card 做补间（Godot4）
+	var tw := create_tween()
+	tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(card, "global_position", target_global, 0.12)
+	# z_index 在 reflow_visuals 里已设置，这里不再补间 z
+
 
 # 把 hit_header 的 CollisionShape2D 调整到“正好覆盖牌眉 strip”
 # 假设：Card 的原点在中心；CollisionShape2D 使用 RectangleShape2D
@@ -158,18 +177,32 @@ func _begin_drag_substack(from_card: Card, start_index: int) -> void:
 		idx = index_of_card(from_card)
 	if idx < 0:
 		return
-	var subset: Array[Card] = extract_from(idx)  # 底->顶
-	var new_pile: PileManager = _spawn_new_pile_for_drag(subset)
+
+	# 取出子叠（底->顶）
+	var subset: Array[Card] = extract_from(idx)
+
+	# —— 关键：新堆的初始位置 = 被点击牌眉那张牌的当前 global_position —— 
+	var origin: Vector2 = from_card.global_position
+
+	var new_pile: PileManager = _spawn_new_pile_for_drag(subset, origin)
 	if new_pile == null:
 		add_cards(subset) # 回退
 		return
+
+	# 立刻进入“整叠拖拽”状态；由于 _drag_offset = mouse - global_position
+	# 且 global_position 没有跳到鼠标中心，所以拖拽将保持“从牌眉拉走”的手感
 	new_pile._begin_drag_pile()
+
+	# 原堆重排
 	_reflow_after_change()
 
-func _spawn_new_pile_for_drag(cards_to_attach: Array[Card]) -> PileManager:
+
+func _spawn_new_pile_for_drag(cards_to_attach: Array[Card], origin_global: Vector2) -> PileManager:
 	var parent_node: Node = get_parent()
 	if parent_node == null:
 		parent_node = get_tree().get_current_scene()
+	if parent_node == null:
+		parent_node = get_tree().get_root()
 
 	var pile_node: Node2D = null
 	if pile_scene != null:
@@ -178,8 +211,9 @@ func _spawn_new_pile_for_drag(cards_to_attach: Array[Card]) -> PileManager:
 		pile_node = Node2D.new()
 		pile_node.set_script(load(get_script().resource_path))
 	parent_node.add_child(pile_node)
-	# 放到鼠标附近（全局）
-	pile_node.global_position = get_global_mouse_position()
+
+	# —— 不再放到鼠标中心；改为放到牌眉（from_card）的当前位置 —— 
+	pile_node.global_position = origin_global
 
 	var new_mgr: PileManager = pile_node as PileManager
 	# 继承参数
@@ -192,8 +226,12 @@ func _spawn_new_pile_for_drag(cards_to_attach: Array[Card]) -> PileManager:
 	new_mgr.drag_z = drag_z
 	new_mgr.pile_scene = pile_scene
 	new_mgr.auto_fit_header = auto_fit_header
+
+	# 重要：add_cards 内部我们已做“reparent 后恢复 global_position”
 	new_mgr.add_cards(cards_to_attach)
+
 	return new_mgr
+
 
 # ---------- 拖拽跟随 / 结束（全局坐标） ----------
 func _process(_delta: float) -> void:

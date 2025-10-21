@@ -110,10 +110,40 @@ func _on_hit_header_input(_viewport: Node, event: InputEvent, _shape_idx: int) -
 		_on_pressed_header()
 
 func _on_pressed_full() -> void:
-	if _in_pile and is_instance_valid(_pile_ref) and _pile_ref.has_method("request_drag"):
-		_pile_ref.call("request_drag", self, "pile")
+	if not _interaction_enabled:
 		return
+
+	# —— 在 pile 中：若点击的是“顶牌整面”，则抽离顶牌→作为单卡拖拽 ——
+	if _in_pile and is_instance_valid(_pile_ref):
+		var top_index := -1
+		if _pile_ref.has_method("get_cards"):
+			var cards: Array = _pile_ref.call("get_cards")
+			if cards.size() > 0:
+				top_index = cards.size() - 1
+		var my_index := -1
+		if _pile_ref.has_method("index_of_card"):
+			my_index = int(_pile_ref.call("index_of_card", self))
+
+		# 顶牌整面点击：从 pile 中摘出自己 → 变成单卡拖拽
+		if my_index == top_index:
+			# 1) 让 pile 移除这张牌（维护内部顺序与重排）
+			if _pile_ref.has_method("extract_from"):
+				_pile_ref.call("extract_from", my_index)   # 顶牌会返回 [self]，内部已 reflow
+
+			# 2) 把这张卡从 pile 的孩子节点里移出到世界/同级（保持全局坐标）
+			_detach_from_pile_to_world()
+
+			# 3) 开始单卡拖拽
+			begin_drag(&"single")
+			return
+
+		# 不是顶牌（理论上 full 命中区已禁用，这里兜底）：按单卡拖拽处理
+		begin_drag(&"single")
+		return
+
+	# —— 不在 pile：正常单卡拖拽 ——
 	begin_drag(&"single")
+
 
 func _on_pressed_header() -> void:
 	if _in_pile and is_instance_valid(_pile_ref) and _pile_ref.has_method("request_drag"):
@@ -220,3 +250,24 @@ func get_dragging() -> bool:
 
 func get_drag_mode() -> StringName:
 	return _drag_mode
+
+# —— 把自己从 pile 中“摘出来”，并保持 global_position 不变 ——
+func _detach_from_pile_to_world() -> void:
+	if not _in_pile or not is_instance_valid(_pile_ref):
+		return
+	var gp: Vector2 = global_position
+	var parent: Node = _pile_ref.get_parent()
+	if parent == null:
+		parent = get_tree().current_scene
+	if parent == null:
+		parent = get_tree().get_root()
+
+	# 从 pile 移除并接到更高一层
+	_pile_ref.remove_child(self)
+	parent.add_child(self)
+
+	# 恢复世界坐标，避免瞬移
+	global_position = gp
+
+	# 清理归属标记
+	set_pile(null)

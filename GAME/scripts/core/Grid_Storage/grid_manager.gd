@@ -233,7 +233,7 @@ func drop_card(card: Card, drop_global: Vector2) -> bool:
 func drop_pile(pile: PileManager, drop_global: Vector2) -> bool:
 	var cell: int = _world_to_cell_idx(drop_global)
 	if cell == -1:
-		cell = _world_to_cell_idx(pile.global_position)  # 兜底：堆中心
+		cell = _world_to_cell_idx(pile.global_position)
 	if cell == -1 and not allow_out_of_bounds:
 		emit_signal("drop_rejected", pile, "out_of_bounds")
 		return false
@@ -250,18 +250,36 @@ func drop_pile(pile: PileManager, drop_global: Vector2) -> bool:
 		emit_signal("drop_rejected", pile, "forbidden_cell")
 		return false
 
-	if dst_pile != pile:
-		var cards: Array = pile.get_cards()
-		for c in cards:
-			dst_pile.add_card(c)
-		pile.queue_free()
+	var dst_pos: Vector2 = get_cell_pos(cell)
 
-	dst_pile.global_position = get_cell_pos(cell)
-	dst_pile.reflow_visuals()
-	_occupancy[cell] = dst_pile
+	# —— 情况 A：落在“自身所占格”（或目标格已有就是这个堆）
+	if dst_pile == pile:
+		var tw := create_tween()
+		tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(pile, "global_position", dst_pos, 0.12)
+		_occupancy[cell] = pile
+		emit_signal("pile_dropped_to_cell", pile, cell)
+		return true
+
+	# —— 情况 B：合并到另一个堆（把卡转过去，再让目标堆滑到位，并在动画结束后重排一次）
+	var cards: Array = pile.get_cards()
+	for c in cards:
+		dst_pile.add_card(c)
+
+	pile.queue_free()
 	_vacate_if(src_cell, pile)
+
+	var tw2 := create_tween()
+	tw2.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw2.tween_property(dst_pile, "global_position", dst_pos, 0.12)
+	tw2.finished.connect(func ():
+		dst_pile.reflow_visuals()  # 动画结束后排一遍，确保层级/位移严丝合缝
+	)
+
+	_occupancy[cell] = dst_pile
 	emit_signal("pile_dropped_to_cell", dst_pile, cell)
 	return true
+
 
 # =========================
 # —— 私有：堆管理 —— 
@@ -358,5 +376,4 @@ func _draw() -> void:
 			idx += 1
 
 func _process(_delta: float) -> void:
-	if show_grid:
-		queue_redraw()
+	pass

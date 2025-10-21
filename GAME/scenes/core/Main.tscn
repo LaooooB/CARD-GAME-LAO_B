@@ -1,11 +1,11 @@
 [gd_scene load_steps=10 format=3 uid="uid://cc607aoh18n2o"]
 
+[ext_resource type="Script" path="res://GAME/scripts/system/camera/camera.gd" id="1_lv8d2"]
 [ext_resource type="Script" path="res://GAME/scripts/system/pagerouter.gd" id="1_rfsmi"]
 [ext_resource type="Texture2D" uid="uid://cf3ebxbxggkyy" path="res://GAME/assets/sprites/world/1920x1080-black-solid-color-background.jpg" id="1_ubykp"]
 [ext_resource type="PackedScene" uid="uid://dj4o5x5ax1at1" path="res://GAME/scenes/gameplay/sellzone.tscn" id="3_ph0mo"]
 [ext_resource type="Script" path="res://GAME/scripts/core/boarderareamanager.gd" id="8_xgcyu"]
 [ext_resource type="Texture2D" uid="uid://dfk665dtn5do3" path="res://GAME/assets/sprites/world/purple.jpg" id="12_yokv5"]
-[ext_resource type="Texture2D" uid="uid://fb36k2tlhk3q" path="res://GAME/assets/sprites/world/vUhuLn.png" id="13_1ux07"]
 [ext_resource type="Script" path="res://GAME/scripts/core/Grid_Storage/grid_manager.gd" id="18_0s2mq"]
 [ext_resource type="PackedScene" uid="uid://no3sefkp5w3w" path="res://GAME/scenes/cards/合成材料/普通/card_wood.tscn" id="19_8ojea"]
 [ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/core/pile.tscn" id="19_isrik"]
@@ -13,101 +13,122 @@
 [node name="Main" type="Node2D"]
 
 [node name="Camera2D" type="Camera2D" parent="."]
-position = Vector2(13, 0)
+z_index = 100
+position = Vector2(950, 540)
+zoom = Vector2(1.01, 1)
+position_smoothing_speed = 10.0
+script = ExtResource("1_lv8d2")
+tween_duration = 0.2
+zoom_max = Vector2(8, 8)
+wheel_step_in = 0.5
+zoom_smooth = 0.1
 
 [node name="System" type="Node" parent="."]
 
 [node name="Page_Router" type="Node" parent="System"]
 script = ExtResource("1_rfsmi")
-camera_path = NodePath("../../Camera2D")
 page_main_root = NodePath("../../Map/Main")
-page_shop_root = NodePath("../../Map/Shop")
-page_storage_root = NodePath("../../Map/Storage")
-page_secret_root = NodePath("../../Map/Secret")
 tween_duration = 0.17
 tween_transition = 7
 tween_ease = 1
+
+[node name="UI" type="Node2D" parent="System"]
 
 [node name="Mechanics" type="Node" parent="System"]
 
 [node name="Sellingzone" parent="System/Mechanics" instance=ExtResource("3_ph0mo")]
 light_mask = 16
 visibility_layer = 16
-position = Vector2(813, -402)
+position = Vector2(1682, -189)
+
+[node name="GridManager" type="Node2D" parent="."]
+top_level = true
+position = Vector2(752, 620)
+script = ExtResource("18_0s2mq")
+origin = Vector2(-570, -455)
+gap = Vector2(4, 4)
+cols = 68
+rows = 27
+snap_radius_ratio = 2.0
+pile_scene = ExtResource("19_isrik")
+grid_outline_width = 2.0
+blocked_outline_color = Color(0, 0, 0, 0.9)
+blocked_outline_width = 3.0
 
 [node name="Map" type="Node2D" parent="."]
+position = Vector2(950, 540)
 
 [node name="Main" type="Node2D" parent="Map"]
 
 [node name="Main_map" type="Sprite2D" parent="Map/Main"]
 position = Vector2(3.2608, 0)
-scale = Vector2(1.01119, 1)
 texture = ExtResource("1_ubykp")
 
 [node name="card_wood" parent="Map/Main" instance=ExtResource("19_8ojea")]
 position = Vector2(-86, -428)
 
+[node name="boarderarea" type="Node2D" parent="Map/Main"]
+position = Vector2(-950, -540)
+script = ExtResource("8_xgcyu")
+per_side_thickness_enabled = true
+top_thickness = 150.0
+right_thickness = 150.0
+bottom_thickness = 150.0
+left_thickness = 150.0
+debug_visible = true
+
 [node name="Shop" type="Node2D" parent="Map"]
-position = Vector2(1980, 0)
+position = Vector2(1920, 0)
 
 [node name="Shop_map" type="Sprite2D" parent="Map/Shop"]
-position = Vector2(6.49997, 0)
-scale = Vector2(1.03906, 1)
-texture = ExtResource("1_ubykp")
-
-[node name="card_wood" parent="Map/Shop" instance=ExtResource("19_8ojea")]
-position = Vector2(-131, -428)
-
-[node name="Storage" type="Node2D" parent="Map"]
-position = Vector2(0, 1100)
-
-[node name="Storage_map" type="Sprite2D" parent="Map/Storage"]
-position = Vector2(6.51994, 0)
-scale = Vector2(1.00779, 1)
+position = Vector2(3.2608, 0)
 texture = ExtResource("12_yokv5")
 
-[node name="GridManager" type="Node2D" parent="Map/Storage"]
-position = Vector2(45, 0)
-script = ExtResource("18_0s2mq")
-origin = Vector2(-600, -350)
-gap = Vector2(4, 4)
-cols = 23
-rows = 100
-snap_radius_ratio = 2.0
-pile_scene = ExtResource("19_isrik")
-grid_fill = false
-grid_outline = false
-grid_outline_width = 2.0
-blocked_outline_color = Color(0, 0, 0, 0.9)
-blocked_outline_width = 3.0
+[node name="card_wood" parent="Map/Shop" instance=ExtResource("19_8ojea")]
+position = Vector2(-86, -428)
 
-[node name="boarderarea" type="Node2D" parent="Map/Storage"]
+[node name="boarderarea" type="Node2D" parent="Map/Shop"]
 position = Vector2(-960, -540)
 script = ExtResource("8_xgcyu")
 per_side_thickness_enabled = true
-top_thickness = 100.0
-
-[node name="card_wood" parent="Map/Storage" instance=ExtResource("19_8ojea")]
-position = Vector2(-131, -428)
-grid_manager_path = NodePath("../GridManager")
-
-[node name="card_wood2" parent="Map/Storage" instance=ExtResource("19_8ojea")]
-position = Vector2(-131, -355)
-grid_manager_path = NodePath("../GridManager")
-
-[node name="card_wood3" parent="Map/Storage" instance=ExtResource("19_8ojea")]
-position = Vector2(-79, -429)
-grid_manager_path = NodePath("../GridManager")
+top_thickness = 150.0
+right_thickness = 150.0
+bottom_thickness = 150.0
+left_thickness = 150.0
+debug_visible = true
 
 [node name="Secret" type="Node2D" parent="Map"]
-position = Vector2(1980, 1100)
+position = Vector2(1920, 1080)
 
-[node name="Secret_map" type="Sprite2D" parent="Map/Secret"]
-position = Vector2(6.51994, 0)
-scale = Vector2(1.00779, 1)
-texture = ExtResource("13_1ux07")
+[node name="Main_map" type="Sprite2D" parent="Map/Secret"]
+position = Vector2(3.2608, 0)
+texture = ExtResource("1_ubykp")
 
 [node name="card_wood" parent="Map/Secret" instance=ExtResource("19_8ojea")]
-position = Vector2(-131, -428)
+position = Vector2(-86, -428)
 
-[node name="UI" type="Node2D" parent="Map"]
+[node name="boarderarea" type="Node2D" parent="Map/Secret"]
+position = Vector2(-960, -540)
+script = ExtResource("8_xgcyu")
+per_side_thickness_enabled = true
+top_thickness = 150.0
+right_thickness = 150.0
+bottom_thickness = 150.0
+left_thickness = 150.0
+debug_visible = true
+
+[node name="Storage" type="Node2D" parent="Map"]
+position = Vector2(0, 1080)
+
+[node name="Storage_map" type="Sprite2D" parent="Map/Storage"]
+position = Vector2(3.2608, 0)
+texture = ExtResource("12_yokv5")
+
+[node name="card_wood" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-86, -428)
+
+[node name="card_wood2" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-160, -398)
+
+[node name="card_wood3" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-3, -424)
