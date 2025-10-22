@@ -1,6 +1,6 @@
 extends Node
 class_name CardAnimation
-## 轻量级卡牌动画组件（强类型 & 严格无推断警告版）
+## 轻量级卡牌动画组件（强类型 & 无警告版）
 
 # ============ 可调参数 ============
 @export var default_duration: float = 0.12
@@ -13,6 +13,7 @@ class_name CardAnimation
 @export var bump_total: float = 0.14            # 总时长
 
 # ============ 信号 ============
+@warning_ignore("UNUSED_SIGNAL")
 signal on_finished   # 任一补间播放完毕时发出（不含 follow_immediate / jump_to）
 
 # ============ 运行态 ============
@@ -20,7 +21,7 @@ var _tween: Tween = null
 
 # --------------- 内部工具 ---------------
 func _kill_tween() -> void:
-	if _tween != null and _tween.is_valid():
+	if _tween != null and is_instance_valid(_tween):
 		_tween.kill()
 	_tween = null
 
@@ -54,30 +55,27 @@ func tween_to(
 		dur: float = -1.0,
 		scale: float = -1.0,
 		z: int = -99999,
-		trans: Tween.TransitionType = -1,
-		ease: Tween.EaseType = -1
+		trans: int = -1,
+		ease_mode: int = -1
 	) -> void:
 	var card: Node2D = _owner_card()
 	if card == null:
 		return
 
 	var d: float = (dur if dur > 0.0 else default_duration)
-	var tr: Tween.TransitionType = (trans if trans != -1 else default_trans)
-	var ea: Tween.EaseType = (ease if ease != -1 else default_ease)
+	var trans_mode: Tween.TransitionType = (trans if trans != -1 else default_trans)
+	var ease_final: Tween.EaseType = (ease_mode if ease_mode != -1 else default_ease)
 
 	_kill_tween()
 	_tween = create_tween()
-	_tween.set_trans(tr).set_ease(ea)
+	_tween.set_trans(trans_mode).set_ease(ease_final)
 
-	# 位置补间
 	_tween.tween_property(card, "global_position", target_global, d)
 
-	# 同步缩放
 	if scale > 0.0:
 		var tw_parallel: Tween = _tween.parallel()
 		tw_parallel.tween_property(card, "scale", Vector2(scale, scale), d)
 
-	# Z 直接设置（Z 不补间）
 	if z != -99999:
 		card.z_index = z
 
@@ -102,7 +100,6 @@ func bump() -> void:
 	_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(card, "global_position", up_pos, up_dur)
 
-	# Godot 4：tween_property 返回 PropertyTweener
 	var tw_down: PropertyTweener = _tween.tween_property(card, "global_position", start, down_dur)
 	tw_down.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 
@@ -142,4 +139,17 @@ func cancel() -> void:
 
 ## 是否有动画在跑
 func is_busy() -> bool:
-	return _tween != null and _tween.is_running()
+	return _tween != null and is_instance_valid(_tween) and _tween.is_running()
+
+## ✨ 新增：回弹到指定点（到位后自动做一次 bump）
+func rebound_to(target_global: Vector2, dur: float = 0.16) -> void:
+	var card: Node2D = _owner_card()
+	if card == null:
+		return
+	_kill_tween()
+	_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(card, "global_position", target_global, dur)
+	_tween.finished.connect(func ():
+		bump()
+		emit_signal("on_finished")
+	)

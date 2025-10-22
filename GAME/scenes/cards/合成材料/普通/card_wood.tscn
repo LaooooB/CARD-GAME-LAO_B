@@ -5,27 +5,27 @@
 [ext_resource type="Script" path="res://GAME/scripts/core/Grid_Storage/card_animation.gd" id="3_3ae2l"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_v3drd"]
-size = Vector2(47, 62)
+size = Vector2(56, 76)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_aa87d"]
-size = Vector2(47, 9)
+size = Vector2(56, 11.5)
 
 [node name="card_wood" type="Node2D"]
 script = ExtResource("1_w4ydi")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(1.2, 1.2)
 texture = ExtResource("1_p8m44")
 
 [node name="hit_full" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="hit_full"]
-position = Vector2(0.5, 0)
 shape = SubResource("RectangleShape2D_v3drd")
 
 [node name="hit_header" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="hit_header"]
-position = Vector2(0.5, -26.5)
+position = Vector2(0, -32.25)
 shape = SubResource("RectangleShape2D_aa87d")
 debug_color = Color(0.69703, 0.421901, 0.676464, 0.42)
 
