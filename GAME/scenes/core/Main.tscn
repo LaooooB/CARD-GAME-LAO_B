@@ -132,3 +132,21 @@ position = Vector2(-160, -398)
 
 [node name="card_wood3" parent="Map/Storage" instance=ExtResource("19_8ojea")]
 position = Vector2(-3, -424)
+
+[node name="card_wood4" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-86, -428)
+
+[node name="card_wood5" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-160, -398)
+
+[node name="card_wood6" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-3, -424)
+
+[node name="card_wood7" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-86, -428)
+
+[node name="card_wood8" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-160, -398)
+
+[node name="card_wood9" parent="Map/Storage" instance=ExtResource("19_8ojea")]
+position = Vector2(-3, -424)

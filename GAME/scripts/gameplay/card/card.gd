@@ -4,7 +4,7 @@ class_name Card
 # =========================
 # —— 可在 Inspector 调参 ——
 # =========================
-@export var grid_manager_path: NodePath                 # 可以留空，自动找 Main 里的 GridManager 节点
+@export var grid_manager_path: NodePath
 @export var sprite_path: NodePath = ^"Sprite2D"
 @export var hit_full_path: NodePath = ^"hit_full"
 @export var hit_header_path: NodePath = ^"hit_header"
@@ -13,10 +13,13 @@ class_name Card
 @export var drag_z: int = 9000
 
 # =========================
-# —— 信号 ——
+# —— 信号（标记已用） ——
 # =========================
+@warning_ignore("UNUSED_SIGNAL")
 signal drag_started(card: Card)
+@warning_ignore("UNUSED_SIGNAL")
 signal drag_moved(card: Card, mouse_global: Vector2)
+@warning_ignore("UNUSED_SIGNAL")
 signal drag_ended(card: Card)
 
 # =========================
@@ -30,14 +33,15 @@ var _anim: Node = null
 
 var _dragging: bool = false
 var _drag_mode: StringName = &"single"        # "single"|"pile"|"substack"
-var _drag_offset: Vector2 = Vector2.ZERO      # 统一用“全局坐标”计算
+var _drag_offset: Vector2 = Vector2.ZERO
 
 var _orig_scale: Vector2 = Vector2.ONE
 var _orig_z: int = 0
 var _interaction_enabled: bool = true
 var _pre_drag_global: Vector2 = Vector2.ZERO
+var _orig_zrel: bool = true
 
-# 堆信息（由 PileManager 调用 set_pile 维护）
+# 堆信息
 var _in_pile: bool = false
 var _pile_ref: Node = null
 
@@ -45,7 +49,6 @@ var _pile_ref: Node = null
 # —— 生命周期 ——
 # =========================
 func _ready() -> void:
-	# 找 GridManager（按路径→按名字→最后兜底/root/Grid）
 	_grid = get_node_or_null(grid_manager_path)
 	if _grid == null and get_tree().current_scene != null:
 		_grid = get_tree().current_scene.get_node_or_null(^"GridManager")
@@ -54,7 +57,6 @@ func _ready() -> void:
 	if _grid == null:
 		_grid = get_node_or_null(^"/root/Grid")
 
-	# 找子节点
 	_sprite = get_node_or_null(sprite_path) as Sprite2D
 	_hit_full = get_node_or_null(hit_full_path) as Area2D
 	_hit_header = get_node_or_null(hit_header_path) as Area2D
@@ -66,12 +68,12 @@ func _ready() -> void:
 		_hit_header = find_child("hit_header", true, false) as Area2D
 
 	_anim = find_child("CardAnimation", true, false)
+	_ensure_anim_on_self()
 
-	# 记录原始视觉
 	_orig_scale = scale
 	_orig_z = z_index
+	_orig_zrel = z_as_relative
 
-	# 连接命中区输入
 	if _hit_full != null:
 		_hit_full.input_event.connect(_on_hit_full_input)
 	if _hit_header != null:
@@ -81,12 +83,12 @@ func _ready() -> void:
 	set_process_unhandled_input(true)
 
 # =========================
-# —— 拖拽跟随（统一用全局鼠标） ——
+# —— 拖拽跟随（全局） ——
 # =========================
 func _process(_delta: float) -> void:
 	if _dragging:
-		var mouse_g: Vector2 = get_global_mouse_position()      # ✅ 全局鼠标
-		var target: Vector2 = mouse_g - _drag_offset            # ✅ 偏移以全局计算
+		var mouse_g: Vector2 = get_global_mouse_position()
+		var target: Vector2 = mouse_g - _drag_offset
 		_follow_to(target)
 		emit_signal("drag_moved", self, mouse_g)
 
@@ -113,7 +115,7 @@ func _on_pressed_full() -> void:
 	if not _interaction_enabled:
 		return
 
-	# —— 在 pile 中：若点击的是“顶牌整面”，则抽离顶牌→作为单卡拖拽 ——
+	# 在 pile 中：若点的是顶牌整面 → 抽离成单卡拖拽
 	if _in_pile and is_instance_valid(_pile_ref):
 		var top_index := -1
 		if _pile_ref.has_method("get_cards"):
@@ -124,26 +126,14 @@ func _on_pressed_full() -> void:
 		if _pile_ref.has_method("index_of_card"):
 			my_index = int(_pile_ref.call("index_of_card", self))
 
-		# 顶牌整面点击：从 pile 中摘出自己 → 变成单卡拖拽
 		if my_index == top_index:
-			# 1) 让 pile 移除这张牌（维护内部顺序与重排）
 			if _pile_ref.has_method("extract_from"):
-				_pile_ref.call("extract_from", my_index)   # 顶牌会返回 [self]，内部已 reflow
-
-			# 2) 把这张卡从 pile 的孩子节点里移出到世界/同级（保持全局坐标）
+				_pile_ref.call("extract_from", my_index)
 			_detach_from_pile_to_world()
-
-			# 3) 开始单卡拖拽
 			begin_drag(&"single")
 			return
 
-		# 不是顶牌（理论上 full 命中区已禁用，这里兜底）：按单卡拖拽处理
-		begin_drag(&"single")
-		return
-
-	# —— 不在 pile：正常单卡拖拽 ——
 	begin_drag(&"single")
-
 
 func _on_pressed_header() -> void:
 	if _in_pile and is_instance_valid(_pile_ref) and _pile_ref.has_method("request_drag"):
@@ -167,10 +157,13 @@ func begin_drag(mode: StringName = &"single") -> void:
 	# 视觉
 	if pickup_scale > 0.0 and absf(pickup_scale - 1.0) > 0.0001:
 		scale = _orig_scale * Vector2(pickup_scale, pickup_scale)
-	if drag_z >= 0:
-		z_index = drag_z
 
-	# ✅ 用全局鼠标计算偏移，避免“飞远”
+	# 抬高到最上层（绝对 z）
+	z_as_relative = false
+	if drag_z >= 0:
+		var z_cap := RenderingServer.CANVAS_ITEM_Z_MAX - 1
+		z_index = min(drag_z, z_cap)
+
 	var mouse_g: Vector2 = get_global_mouse_position()
 	_drag_offset = mouse_g - global_position
 
@@ -182,24 +175,29 @@ func _end_drag_and_drop() -> void:
 	_dragging = false
 	emit_signal("drag_ended", self)
 
-	# 恢复视觉
-	_restore_visual()
+	var accepted := false
 
-	# ✅ 单卡落子：把“卡的全局位置”传给 Grid（或传全局鼠标也行）
+	# 单卡落子：交给 Grid；失败则“回弹 + bump”
 	if _drag_mode == &"single" and _grid != null and is_instance_valid(_grid) and _grid.has_method("drop_card"):
-		var ok := bool(_grid.call("drop_card", self, global_position))
-		if not ok:
-		# 回到原位（有动画就用动画）
+		accepted = bool(_grid.call("drop_card", self, global_position))
+		if not accepted:
+			# 回弹
 			if _anim != null and _anim.has_method("tween_to"):
-				_anim.call("tween_to", _pre_drag_global, 0.15, 1.0, z_index)
+				_anim.call("tween_to", _pre_drag_global, 0.16, 1.0, _orig_z)
+				if _anim.has_method("bump"):
+					await get_tree().create_timer(0.17).timeout
+					_anim.call("bump")
 			else:
 				global_position = _pre_drag_global
+
+	_restore_visual_post_drop(accepted)
 
 func cancel_drag() -> void:
 	if _dragging:
 		_dragging = false
 		emit_signal("drag_ended", self)
-	_restore_visual()
+	# 取消视为未被接收
+	_restore_visual_post_drop(false)
 
 # =========================
 # —— 公共：堆叠归属 & 命中开关 ——
@@ -232,15 +230,27 @@ func set_hit_areas(full_enabled: bool, header_enabled: bool) -> void:
 # =========================
 # —— 内部：位置/视觉/动画 ——
 # =========================
+	_ensure_anim_on_self()
 func _follow_to(target_global: Vector2) -> void:
 	if _anim != null and _anim.has_method("follow_immediate"):
 		_anim.call("follow_immediate", self, target_global)
 	else:
 		global_position = target_global
 
-func _restore_visual() -> void:
-	z_index = _orig_z
+# 关键改动：根据“是否已进入 pile 且被接收”决定是否恢复 z
+func _restore_visual_post_drop(accepted: bool) -> void:
+	# 无论如何都把缩放恢复
 	scale = _orig_scale
+
+	if accepted and _in_pile:
+		# ✅ 已进入某个 pile：层级交给 PileManager 管
+		# 只需保证相对 z 打开，让 reflow_visuals() 的 per-layer z 生效
+		z_as_relative = true
+		# 不再改 z_index（避免覆盖 PileManager 刚设的层）
+	else:
+		# ❌ 未被接收（或不在 pile 中）：恢复成拖拽前的独立层级
+		z_index = _orig_z
+		z_as_relative = _orig_zrel
 
 # =========================
 # —— 辅助 ——
@@ -251,7 +261,6 @@ func get_dragging() -> bool:
 func get_drag_mode() -> StringName:
 	return _drag_mode
 
-# —— 把自己从 pile 中“摘出来”，并保持 global_position 不变 ——
 func _detach_from_pile_to_world() -> void:
 	if not _in_pile or not is_instance_valid(_pile_ref):
 		return
@@ -261,13 +270,19 @@ func _detach_from_pile_to_world() -> void:
 		parent = get_tree().current_scene
 	if parent == null:
 		parent = get_tree().get_root()
-
-	# 从 pile 移除并接到更高一层
 	_pile_ref.remove_child(self)
 	parent.add_child(self)
-
-	# 恢复世界坐标，避免瞬移
 	global_position = gp
-
-	# 清理归属标记
 	set_pile(null)
+
+# ===== Card.gd：新增：确保自身有 CardAnimation =====
+func _ensure_anim_on_self() -> CardAnimation:
+	if _anim != null and is_instance_valid(_anim):
+		return _anim
+	var a := get_node_or_null(^"CardAnimation") as CardAnimation
+	if a == null:
+		a = CardAnimation.new()
+		a.name = "CardAnimation"
+		add_child(a)
+	_anim = a
+	return a
