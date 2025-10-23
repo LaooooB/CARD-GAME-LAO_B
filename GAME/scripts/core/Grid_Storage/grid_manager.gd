@@ -205,19 +205,9 @@ func unblock_all() -> void:
 # —— 输入：投放（吸附） —— 
 # =========================
 func drop_card(card: Card, drop_global: Vector2) -> bool:
-	# —— ① 优先：命中任意 pile → 直接并入（不走格子、不理会禁格） ——
-	var pile_hit: PileManager = _pick_pile_at_point(drop_global)
-	if pile_hit != null:
-		# 并入目标堆
-		pile_hit.add_card(card)
-		pile_hit.reflow_visuals()
-		# 目标堆自身会在 reflow 后刷新禁格（若你已加 _update_blocked_cells）
-		return true
-
-	# —— ② 回退：原有的 grid snap 逻辑（含禁格） ——
 	var cell: int = _world_to_cell_idx(drop_global)
 	if cell == -1:
-		cell = _world_to_cell_idx(card.global_position)
+		cell = _world_to_cell_idx(card.global_position)  # 兜底：卡中心
 	if cell == -1 and not allow_out_of_bounds:
 		emit_signal("drop_rejected", card, "out_of_bounds")
 		return false
@@ -241,98 +231,55 @@ func drop_card(card: Card, drop_global: Vector2) -> bool:
 	return true
 
 func drop_pile(pile: PileManager, drop_global: Vector2) -> bool:
-	# —— ① 优先：命中其它 pile → 合并堆（不走格子）——
-	var target_pile: PileManager = _pick_pile_at_point(drop_global)
-	if target_pile != null and target_pile != pile:
-		var src_cell: int = _find_cell_by_pile(pile)
-		var cards_to_merge: Array = pile.get_cards()
-		for c in cards_to_merge:
-			target_pile.add_card(c)
-		pile.queue_free()
-		_vacate_if(src_cell, pile)
-
-		var dst_pos: Vector2 = target_pile.global_position
-		var tw := create_tween()
-		tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		tw.tween_property(target_pile, "global_position", dst_pos, 0.12)
-		tw.finished.connect(func ():
-			target_pile.reflow_visuals()
-			if target_pile.has_method("_update_blocked_cells"):
-				target_pile.call("_update_blocked_cells")
-		)
-
-		emit_signal("pile_dropped_to_cell", target_pile, _find_cell_by_pile(target_pile))
-		return true
-
-	# —— ② 常规：按格吸附（含禁格判定）——
 	var cell: int = _world_to_cell_idx(drop_global)
 	if cell == -1:
 		cell = _world_to_cell_idx(pile.global_position)
 	if cell == -1 and not allow_out_of_bounds:
 		emit_signal("drop_rejected", pile, "out_of_bounds")
 		return false
+	if cell != -1 and is_cell_forbidden(cell):
+		emit_signal("drop_rejected", pile, "forbidden_cell")
+		return false
 	if cell == -1 and allow_out_of_bounds:
 		emit_signal("drop_rejected", pile, "no_snap_region")
 		return false
 
-	# 命中禁格：仅当该禁格“归属堆”为本堆时才放行
-	var moving_into_own_blocked := false
-	if cell != -1 and is_cell_forbidden(cell):
-		var owner: PileManager = _owner_of_forbidden_cell(cell)
-		if owner == pile:
-			moving_into_own_blocked = true
-		else:
-			emit_signal("drop_rejected", pile, "forbidden_cell")
-			return false
-
-	# —— 特例：落在“自己禁的格”上 → 直接把这堆移动到该格（不走 _ensure_pile）——
-	if moving_into_own_blocked:
-		var src_cell_direct: int = _find_cell_by_pile(pile)
-		if src_cell_direct >= 0:
-			_vacate_if(src_cell_direct, pile)
-		_occupancy[cell] = pile
-
-		var dst_pos_direct: Vector2 = get_cell_pos(cell)
-		var twd := create_tween()
-		twd.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		twd.tween_property(pile, "global_position", dst_pos_direct, 0.12)
-		twd.finished.connect(func ():
-			pile.reflow_visuals()
-			if pile.has_method("_update_blocked_cells"):
-				pile.call("_update_blocked_cells")
-		)
-
-		emit_signal("pile_dropped_to_cell", pile, cell)
-		return true
-
-	# —— ③ 普通格：确保/合并 + tween —— 
-	var src_cell2: int = _find_cell_by_pile(pile)
-	var dst_pile2: PileManager = _ensure_pile(cell)
-	if dst_pile2 == null:
+	var src_cell: int = _find_cell_by_pile(pile)
+	var dst_pile: PileManager = _ensure_pile(cell)
+	if dst_pile == null:
 		emit_signal("drop_rejected", pile, "forbidden_cell")
 		return false
 
-	if dst_pile2 != pile:
-		var cards2: Array = pile.get_cards()
-		for c2 in cards2:
-			dst_pile2.add_card(c2)
-		pile.queue_free()
+	var dst_pos: Vector2 = get_cell_pos(cell)
 
-	dst_pile2.global_position = get_cell_pos(cell)
+	# —— 情况 A：落在“自身所占格”（或目标格已有就是这个堆）
+	if dst_pile == pile:
+		var tw := create_tween()
+		tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(pile, "global_position", dst_pos, 0.12)
+		_occupancy[cell] = pile
+		emit_signal("pile_dropped_to_cell", pile, cell)
+		return true
+
+	# —— 情况 B：合并到另一个堆（把卡转过去，再让目标堆滑到位，并在动画结束后重排一次）
+	var cards: Array = pile.get_cards()
+	for c in cards:
+		dst_pile.add_card(c)
+
+	pile.queue_free()
+	_vacate_if(src_cell, pile)
 
 	var tw2 := create_tween()
 	tw2.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw2.tween_property(dst_pile2, "global_position", get_cell_pos(cell), 0.12)
+	tw2.tween_property(dst_pile, "global_position", dst_pos, 0.12)
 	tw2.finished.connect(func ():
-		dst_pile2.reflow_visuals()
-		if dst_pile2.has_method("_update_blocked_cells"):
-			dst_pile2.call("_update_blocked_cells")
+		dst_pile.reflow_visuals()  # 动画结束后排一遍，确保层级/位移严丝合缝
 	)
 
-	_occupancy[cell] = dst_pile2
-	_vacate_if(src_cell2, pile)
-	emit_signal("pile_dropped_to_cell", dst_pile2, cell)
+	_occupancy[cell] = dst_pile
+	emit_signal("pile_dropped_to_cell", dst_pile, cell)
 	return true
+
 
 # =========================
 # —— 私有：堆管理 —— 
@@ -430,211 +377,3 @@ func _draw() -> void:
 
 func _process(_delta: float) -> void:
 	pass
-
-# —— 收集当前存在的 pile（从占用表提取，去重） ——
-func _iter_piles() -> Array[PileManager]:
-	var out: Array[PileManager] = []
-	var seen: Dictionary = {}
-	for i in range(cols * rows):
-		var p: PileManager = _occupancy.get(i, null)
-		if p != null and is_instance_valid(p) and not seen.has(p):
-			seen[p] = true
-			out.append(p)
-	return out
-
-# —— 命中检测：根据鼠标点挑选命中的 pile（优先 z 较高者） ——
-func _pick_pile_at_point(point: Vector2) -> PileManager:
-	var best: PileManager = null
-	var best_z: int = -1
-
-	for child in get_children():
-		var pile := child as PileManager
-		if pile == null:
-			continue
-
-		if _point_hits_pile_top_card(point, pile):
-			# 用顶牌 z 决定“视觉上谁在上面”
-			var z_top: int = 0
-			var cards: Array = pile.get_cards()
-			if cards.size() > 0:
-				var top_card := cards[cards.size() - 1] as Node2D
-				if top_card != null:
-					z_top = top_card.z_index
-			if z_top >= best_z:
-				best_z = z_top
-				best = pile
-	return best
-
-
-# —— 用“顶牌的包围盒”近似命中（无需依赖 Area2D API，鲁棒性更好） ——
-func _point_hits_pile_top_card(point: Vector2, pile: PileManager) -> bool:
-	var cards: Array = pile.get_cards()
-	if cards.size() == 0:
-		return false
-
-	var top_card := cards[cards.size() - 1] as Node2D
-	if top_card == null:
-		return false
-
-	# 以像素尺寸 × 节点缩放构造顶牌的 AABB（无旋转假设；若你旋转了卡牌可再升级成变换到局部判断）
-	var size_px: Vector2 = pile.card_pixel_size * top_card.scale	# 避免写死
-	var half: Vector2 = size_px * 0.5
-	var topleft: Vector2 = top_card.global_position - half
-	var rect := Rect2(topleft, size_px)
-
-	return rect.has_point(point)
-
-# ==== 挤压逻辑：当某格将被禁用时，把占用者往下（或斜下）推开 ====
-
-# 外部入口：由 PileManager._update_blocked_cells() 调用
-# avoid_cells: 当前这个 blocking_pile 即将禁用的格子集合，挤压时避开它们
-func displace_if_needed(blocking_pile: PileManager, cell: int, avoid_cells: Array[int]) -> void:
-	var victim: PileManager = _occupancy.get(cell, null)
-	if victim == null or not is_instance_valid(victim):
-		return
-	if victim == blocking_pile:
-		return
-	var visited: Dictionary = {}
-	# 计算从该 cell 出发的“首选目的地序列”
-	var candidates: Array[int] = _preferred_destinations(cell, avoid_cells)
-	_push_chain(victim, candidates, visited, avoid_cells)
-
-
-
-# 目的地优先序列生成：
-# - 若下方仍在网格内：返回“同一列从下一行直到最底行”的候选列表（避开 avoid_cells）
-# - 若已在最底行（下方出界）：返回“同一行的左右”候选（随机左右，避开 avoid_cells）
-func _preferred_destinations(from_cell: int, avoid_cells: Array[int]) -> Array[int]:
-	var out: Array[int] = []
-	var avoid: Dictionary = {}
-	for a: int in avoid_cells:
-		avoid[a] = true
-
-	var rc: Vector2i = _rc(from_cell)
-	var below_r: int = rc.y + 1
-
-	if below_r < rows:
-		# 直线向下：同列一路到底（从 rc.y+1 到 rows-1）
-		for r: int in range(below_r, rows):
-			var cidx: int = _idx(rc.x, r)
-			if not avoid.has(cidx) and not is_cell_forbidden(cidx):
-				out.append(cidx)
-	else:
-		# 最底行：改为同一行左右平移
-		var dirs: Array[int] = [-1, 1]
-		if randi() % 2 == 1:
-			dirs = [1, -1]
-		for dx: int in dirs:
-			var cx: int = rc.x + dx
-			if cx >= 0 and cx < cols:
-				var cidx2: int = _idx(cx, rc.y)
-				if not avoid.has(cidx2) and not is_cell_forbidden(cidx2):
-					out.append(cidx2)
-	return out
-
-
-# 递归挤压：若目的地被占，先把占用者根据“它自己的优先序列”再往后挤
-func _push_chain(pile: PileManager, candidates: Array[int], visited: Dictionary, avoid_cells: Array[int]) -> bool:
-	if pile == null or not is_instance_valid(pile):
-		return false
-	if visited.has(pile):
-		return false
-	visited[pile] = true
-
-	for dest: int in candidates:
-		if dest < 0 or not _valid_cell(dest) or is_cell_forbidden(dest):
-			continue
-
-		var occ: PileManager = _occupancy.get(dest, null)
-		if occ == null or not is_instance_valid(occ):
-			_move_pile_to_cell(pile, dest)
-			return true
-
-		if occ == pile:
-			continue
-
-		# 目的地被占：按“该占用者自己的规则”生成它的目的地序列，然后尝试把它先挪开
-		var deeper: Array[int] = _preferred_destinations(dest, avoid_cells)
-		if _push_chain(occ, deeper, visited, avoid_cells):
-			_move_pile_to_cell(pile, dest)
-			return true
-
-	return false
-
-
-
-# 实际移动：更新占用表 + tween + 触发重排与禁用刷新
-func _move_pile_to_cell(pile: PileManager, dest_cell: int) -> void:
-	if pile == null or not is_instance_valid(pile):
-		return
-	if not _valid_cell(dest_cell) or is_cell_forbidden(dest_cell):
-		return
-
-	# 源格
-	var src_cell: int = _find_cell_by_pile(pile)
-	if src_cell == dest_cell:
-		return
-
-	# 占用表更新
-	if src_cell >= 0:
-		_occupancy[src_cell] = null
-	_occupancy[dest_cell] = pile
-
-	# 动画移动到格中心
-	var dst_pos: Vector2 = get_cell_pos(dest_cell)
-	var tw := create_tween()
-	tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.tween_property(pile, "global_position", dst_pos, 0.12)
-	tw.finished.connect(func ():
-		pile.reflow_visuals()
-		if pile.has_method("_update_blocked_cells"):
-			pile.call("_update_blocked_cells")
-	)
-
-# 该格是否被“除 owner 以外的其它堆”标记为禁用
-func _is_blocked_by_other_pile(cell: int, owner: PileManager) -> bool:
-	for p: PileManager in _iter_piles():
-		if p == null or not is_instance_valid(p):
-			continue
-		if p == owner:
-			continue
-		if p.has_method("owns_blocked_cell") and bool(p.call("owns_blocked_cell", cell)):
-			return true
-	return false
-
-# —— 计算某禁用格的“所有者堆”
-# 条件：同列向上最近、且其覆盖高度足以包含该格
-func _owner_of_forbidden_cell(cell: int) -> PileManager:
-	if not is_cell_forbidden(cell):
-		return null
-
-	var rc_target: Vector2i = _rc(cell)
-	var step_h: float = _step_size().y
-
-	# 从目标格上一行开始向上扫描
-	for r in range(rc_target.y - 1, -1, -1):
-		var above_cell: int = _idx(rc_target.x, r)
-		var p := _occupancy.get(above_cell, null) as PileManager
-		if p == null or not is_instance_valid(p):
-			continue
-
-		# 该堆的“可见叠高”换算为覆盖的行数
-		var cards_count: int = 0
-		if p.has_method("get_cards"):
-			var arr: Array = p.call("get_cards")
-			cards_count = arr.size()
-
-		var visible_ratio: float = 0.15
-		if "visible_ratio" in p:
-			visible_ratio = float(p.visible_ratio)
-
-		var card_h: float = (p.card_pixel_size.y if "card_pixel_size" in p else card_pixel_size.y)
-		var pile_height_px: float = card_h * visible_ratio * float(max(cards_count - 1, 0))
-		var rows_covered: int = int(ceil(pile_height_px / max(step_h, 0.0001)))
-
-		# 若该堆覆盖到目标格所在行，则它就是归属者
-		var delta_rows: int = rc_target.y - r
-		if delta_rows <= rows_covered and rows_covered > 0:
-			return p
-
-	return null
