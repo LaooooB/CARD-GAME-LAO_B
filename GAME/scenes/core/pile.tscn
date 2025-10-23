@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://blug5f3tuhree"]
-
-[ext_resource type="Script" path="res://GAME/scripts/core/Grid_Storage/pile_manager.gd" id="1_21v2u"]
-
-[node name="PileManager" type="Node2D"]
-script = ExtResource("1_21v2u")

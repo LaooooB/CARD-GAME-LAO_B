@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://86sl81mia55"]
 
-[ext_resource type="Script" path="res://GAME/scripts/core/boarderareamanager.gd" id="1_upbr3"]
+[ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/boarderareamanager.gd" id="1_upbr3"]
 
 [node name="BoarderArea" type="Node2D"]
 script = ExtResource("1_upbr3")

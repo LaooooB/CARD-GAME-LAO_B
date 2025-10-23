@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://ccps7lpjbnn61"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ob675"]
+
+[node name="StarterPack" type="Node2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+
+[node name="HitArea" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HitArea"]
+shape = SubResource("RectangleShape2D_ob675")
+
+[node name="Strech" type="AnimationPlayer" parent="."]
+
+[node name="Open" type="AnimationPlayer" parent="."]
+
+[node name="Disappear" type="AnimationPlayer" parent="."]
+root_node = NodePath("../Open")

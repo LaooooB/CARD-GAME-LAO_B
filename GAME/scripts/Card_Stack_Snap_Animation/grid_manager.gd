@@ -608,16 +608,24 @@ func _owner_of_forbidden_cell(cell: int) -> PileManager:
 
 # ===== GridManager.gd：替换 _ensure_anim_on =====
 func _ensure_anim_on(node: Node2D) -> CardAnimation:
-	var anim := node.get_node_or_null(^"CardAnimation") as CardAnimation
-	if anim == null:
-		anim = CardAnimation.new()
-		anim.name = "CardAnimation"
-		node.add_child(anim)
+	var anim := _find_card_anim(node)
+	if anim != null:
+		return anim
+
+	var named := node.get_node_or_null(^"CardAnimation")
+	if named != null and not (named is CardAnimation):
+		named.name = "CardAnimation_Legacy"
+
+	anim = CardAnimation.new()
+	anim.name = "CardAnimation"
+	node.add_child(anim)
+
+	if has_method("_anim_defaults"):
 		var tmpl := _anim_defaults()
 		if tmpl != null:
 			_copy_anim_defaults(anim, tmpl)
-	return anim
 
+	return anim
 
 # ===== GridManager.gd：新增：动画模板工具 =====
 func _anim_defaults() -> CardAnimation:
@@ -634,3 +642,9 @@ func _copy_anim_defaults(dst: CardAnimation, src: CardAnimation) -> void:
 	dst.bump_offset      = src.bump_offset
 	dst.bump_up_ratio    = src.bump_up_ratio
 	dst.bump_total       = src.bump_total
+
+func _find_card_anim(node: Node) -> CardAnimation:
+	for child in node.get_children():
+		if child is CardAnimation:
+			return child
+	return null

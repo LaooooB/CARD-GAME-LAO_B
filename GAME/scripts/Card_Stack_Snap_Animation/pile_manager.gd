@@ -120,12 +120,25 @@ func _set_card_layer(card: Card, z: int) -> void:
 
 func _move_card(card: Card, local_pos: Vector2) -> void:
 	var target_global: Vector2 = to_global(local_pos)
+
+	# 正在拖堆或暂停动画时，直接到位
 	if _suspend_anim or _dragging:
 		card.global_position = target_global
 		return
-	var anim := _ensure_anim_on(card)
-	# 使用 -1.0 表示尊重 CardAnimation 的 Inspector 默认时长与不改缩放
-	anim.tween_to(target_global, -1.0, -1.0, card.z_index)
+
+	# —— 关键改动：单卡 snap 使用“堆”的动画参数 —— 
+	var pile_defs := _snap_defaults_from_pile()   # 从堆的 CardAnimation 取 Inspector 配置
+	var card_anim := _ensure_anim_on(card)        # 确保拿到“真”的 CardAnimation（类型查找）
+
+	card_anim.tween_to(
+		target_global,
+		pile_defs["dur"],        # 时长用堆的 Inspector
+		-1.0,                    # 不改缩放
+		card.z_index,            # 目标 z（已由 _set_card_layer 决定）
+		pile_defs["trans"],      # 过渡曲线用堆的 Inspector
+		pile_defs["ease"]        # 缓动用堆的 Inspector
+	)
+
 
 
 # 牌眉命中区尺寸/位置调整
@@ -272,26 +285,24 @@ func _end_drag_and_drop() -> void:
 
 # ---------- 回弹动画 ----------
 func _rebound_to_pre_drag() -> void:
-	_kill_rebound() # 仅保留“防重复”语义，不再手动建 tween
+	_kill_rebound()
 	_set_all_cards_interaction(true)
 
 	# 回弹前先恢复 z，避免长时间遮挡
 	z_index = _orig_z
 
-	var anim := _self_anim()
-	# 用一次性连接，避免重复回调（无需 disconnect_all）
+	var anim := _ensure_anim_on(self)  # 始终拿“真”的 CardAnimation
+	# 回弹完成后：顶牌 bump + 刷新禁用格
 	anim.on_finished.connect(func ():
-		# 顶牌做一个轻微 bump，反馈“放置无效”
 		if _cards.size() > 0:
 			var top := _cards[_cards.size() - 1]
 			var top_anim := _ensure_anim_on(top)
 			top_anim.bump()
-		# 回弹后刷新禁用格状态
 		if has_method("_update_blocked_cells"):
 			_update_blocked_cells()
 	, CONNECT_ONE_SHOT)
 
-	# 用统一的 rebound_to（可用默认 0.16 或交给 CardAnimation Inspector）
+	# 统一由 CardAnimation 控制回弹时长/曲线（0.16 只是位移耗时，曲线由组件 Inspector 决定）
 	anim.rebound_to(_pre_drag_global, 0.16)
 
 
@@ -368,21 +379,47 @@ func _release_all_blocked_cells() -> void:
 
 func _restore_pile_parent_if_needed() -> void:
 	pass
-# ===== PileManager.gd：替换 _ensure_anim_on =====
+# ===== 替换版：确保拿到“真”的 CardAnimation（按类型查找 & 处理重名占位） =====
 func _ensure_anim_on(node: Node2D) -> CardAnimation:
-	var anim := node.get_node_or_null(^"CardAnimation") as CardAnimation
-	if anim == null:
-		anim = CardAnimation.new()
-		anim.name = "CardAnimation"
-		node.add_child(anim)
+	var anim := _find_card_anim(node)
+	if anim != null:
+		return anim
+
+	# 若存在一个叫 CardAnimation 但没挂脚本的节点，先避让
+	var named := node.get_node_or_null(^"CardAnimation")
+	if named != null and not (named is CardAnimation):
+		named.name = "CardAnimation_Legacy"
+
+	# 新建真组件
+	anim = CardAnimation.new()
+	anim.name = "CardAnimation"
+	node.add_child(anim)
+
+	# 若你在本脚本里有 anim_defaults_path / _anim_defaults / _copy_anim_defaults，就拷贝模板参数
+	if has_method("_anim_defaults"):
 		var tmpl := _anim_defaults()
 		if tmpl != null:
 			_copy_anim_defaults(anim, tmpl)
+
 	return anim
 
-
+# —— 取“堆”的 CardAnimation（按类型，不靠重名）——
 func _self_anim() -> CardAnimation:
+	for child in get_children():
+		if child is CardAnimation:
+			return child
+	# 若没有，复用你现有的确保逻辑
 	return _ensure_anim_on(self)
+
+# —— 从“堆”的 CardAnimation 读取 snap 默认参数 —— 
+func _snap_defaults_from_pile() -> Dictionary:
+	var a := _self_anim()
+	return {
+		"dur":  a.default_duration,
+		"trans": a.default_trans,
+		"ease": a.default_ease
+	}
+
 
 # ===== PileManager.gd：新增：动画模板工具 =====
 func _anim_defaults() -> CardAnimation:
@@ -399,3 +436,10 @@ func _copy_anim_defaults(dst: CardAnimation, src: CardAnimation) -> void:
 	dst.bump_offset      = src.bump_offset
 	dst.bump_up_ratio    = src.bump_up_ratio
 	dst.bump_total       = src.bump_total
+
+# —— 按“类型”查找 CardAnimation（不要靠重名）——
+func _find_card_anim(node: Node) -> CardAnimation:
+	for child in node.get_children():
+		if child is CardAnimation:
+			return child
+	return null

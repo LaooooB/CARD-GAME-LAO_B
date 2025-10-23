@@ -1,3 +1,0 @@
-input_a_idinput_b_idresult_id
-#00001 #00001 #00100
-

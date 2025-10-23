@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://c1ya7ef6fvflj"]
+
+[ext_resource type="PackedScene" uid="uid://cc607aoh18n2o" path="res://GAME/scenes/2D/Card_Stack_Snap_Animation/Main.tscn" id="1_lp2jv"]
+
+[node name="Start" type="Node3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1.19249e-08, 1, 0, -1, 1.19249e-08, 0, 2.18199, 0)
+fov = 84.7448
+
+[node name="Main" parent="." instance=ExtResource("1_lp2jv")]

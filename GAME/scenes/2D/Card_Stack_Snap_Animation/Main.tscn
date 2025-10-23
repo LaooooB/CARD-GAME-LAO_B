@@ -1,14 +1,13 @@
-[gd_scene load_steps=10 format=3 uid="uid://cc607aoh18n2o"]
+[gd_scene load_steps=9 format=3 uid="uid://cc607aoh18n2o"]
 
 [ext_resource type="Script" path="res://GAME/scripts/system/camera/camera.gd" id="1_lv8d2"]
 [ext_resource type="Script" path="res://GAME/scripts/system/pagerouter.gd" id="1_rfsmi"]
 [ext_resource type="Texture2D" uid="uid://cf3ebxbxggkyy" path="res://GAME/assets/sprites/world/1920x1080-black-solid-color-background.jpg" id="1_ubykp"]
-[ext_resource type="PackedScene" uid="uid://dj4o5x5ax1at1" path="res://GAME/scenes/gameplay/sellzone.tscn" id="3_ph0mo"]
-[ext_resource type="Script" path="res://GAME/scripts/core/boarderareamanager.gd" id="8_xgcyu"]
+[ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/boarderareamanager.gd" id="8_xgcyu"]
 [ext_resource type="Texture2D" uid="uid://dfk665dtn5do3" path="res://GAME/assets/sprites/world/purple.jpg" id="12_yokv5"]
-[ext_resource type="Script" path="res://GAME/scripts/core/Grid_Storage/grid_manager.gd" id="18_0s2mq"]
-[ext_resource type="PackedScene" uid="uid://no3sefkp5w3w" path="res://GAME/scenes/cards/合成材料/普通/card_wood.tscn" id="19_8ojea"]
-[ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/core/pile.tscn" id="19_isrik"]
+[ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/grid_manager.gd" id="18_0s2mq"]
+[ext_resource type="PackedScene" uid="uid://no3sefkp5w3w" path="res://GAME/scenes/2D/cards/Crafting material/common/card_wood.tscn" id="19_8ojea"]
+[ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/2D/Card_Stack_Snap_Animation/pile.tscn" id="19_isrik"]
 
 [node name="Main" type="Node2D"]
 
@@ -35,11 +34,6 @@ tween_ease = 1
 [node name="UI" type="Node2D" parent="System"]
 
 [node name="Mechanics" type="Node" parent="System"]
-
-[node name="Sellingzone" parent="System/Mechanics" instance=ExtResource("3_ph0mo")]
-light_mask = 16
-visibility_layer = 16
-position = Vector2(1682, -189)
 
 [node name="GridManager" type="Node2D" parent="."]
 top_level = true

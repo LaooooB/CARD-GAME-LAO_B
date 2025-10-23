@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Card_Game"
-run/main_scene="res://GAME/scenes/core/Main.tscn"
+run/main_scene="res://GAME/scenes/2D/Card_Stack_Snap_Animation/Main.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -38,13 +38,12 @@ folder_colors={
 "res://GAME/assets/sprites/world/": "orange",
 "res://GAME/data/": "blue",
 "res://GAME/scenes/": "yellow",
-"res://GAME/scenes/core/": "yellow",
-"res://GAME/scenes/gameplay/": "yellow",
+"res://GAME/scenes/2D/Card_Stack_Snap_Animation/": "yellow",
+"res://GAME/scenes/2D/gameplay/": "yellow",
 "res://GAME/scenes/maps/": "yellow",
 "res://GAME/scenes/meta/": "yellow",
 "res://GAME/scenes/ui/": "yellow",
 "res://GAME/scripts/": "red",
-"res://GAME/scripts/core/": "red",
 "res://GAME/scripts/gameplay/": "red",
 "res://GAME/scripts/system/": "red",
 "res://GAME/scripts/ui/": "red"

@@ -143,3 +143,30 @@ func cancel() -> void:
 ## 是否有动画在跑
 func is_busy() -> bool:
 	return _tween != null and _tween.is_running()
+
+## 回弹到指定点（仅位置补间；默认不自动 bump，避免与外部重复）
+func rebound_to(
+		target_global: Vector2,
+		dur: float = -1.0,
+		do_bump: bool = false,
+		trans: int = -1,
+		ease_mode: int = -1
+	) -> void:
+	var card: Node2D = _owner_card()
+	if card == null:
+		return
+
+	var d: float = (dur if dur > 0.0 else default_duration)
+	var trans_mode: Tween.TransitionType = (trans if trans != -1 else default_trans)
+	var ease_final: Tween.EaseType = (ease_mode if ease_mode != -1 else default_ease)
+
+	_kill_tween()
+	_tween = create_tween()
+	_tween.set_trans(trans_mode).set_ease(ease_final)
+	_tween.tween_property(card, "global_position", target_global, d)
+
+	_tween.finished.connect(func () -> void:
+		if do_bump:
+			bump()
+		emit_signal("on_finished")
+	)

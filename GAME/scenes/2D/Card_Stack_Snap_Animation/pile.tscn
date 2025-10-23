@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://blug5f3tuhree"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/pile_manager.gd" id="1_avo0y"]
+
+[node name="PileManager" type="Node2D"]
+script = ExtResource("1_avo0y")
