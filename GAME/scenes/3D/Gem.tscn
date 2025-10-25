@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://byuunpnhk0v7x"]
+
+[ext_resource type="PackedScene" uid="uid://bgoupyagpm45a" path="res://GAME/data/3D/diamond.glb" id="1_3an1s"]
+
+[node name="Gem" type="Node3D"]
+
+[node name="Sketchfab_Scene" parent="." instance=ExtResource("1_3an1s")]

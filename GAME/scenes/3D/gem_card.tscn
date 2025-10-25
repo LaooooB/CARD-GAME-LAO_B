@@ -1,0 +1,52 @@
+[gd_scene load_steps=3 format=3 uid="uid://yus44cxd1pbx"]
+
+[ext_resource type="PackedScene" uid="uid://byuunpnhk0v7x" path="res://GAME/scenes/3D/Gem.tscn" id="1_1hokd"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mjiri"]
+size = Vector3(1, 1.45313, 1.51534)
+
+[node name="Gem" type="Node2D"]
+
+[node name="SubViewportContainer" type="SubViewportContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -512.0
+offset_top = -512.0
+offset_right = 512.0
+offset_bottom = 512.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SubViewport" type="SubViewport" parent="SubViewportContainer"]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(1024, 1024)
+render_target_update_mode = 4
+
+[node name="OmniLight3D" type="OmniLight3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.000455931, 0.993982, 0.00047785)
+light_color = Color(0.54902, 0.517647, 0.396078, 1)
+light_energy = 1000.0
+shadow_enabled = true
+shadow_normal_bias = 0.1
+shadow_blur = 3.0
+distance_fade_enabled = true
+distance_fade_begin = 1.0
+distance_fade_length = 1.0
+omni_range = 0.300627
+
+[node name="Gem" parent="SubViewportContainer/SubViewport" instance=ExtResource("1_1hokd")]
+transform = Transform3D(0.005, 0, 0, 0, 0.00453154, -0.00211309, 0, 0.00211309, 0.00453154, 0, 0.967044, 0)
+
+[node name="Area3D" type="Area3D" parent="SubViewportContainer/SubViewport/Gem"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewportContainer/SubViewport/Gem/Area3D"]
+transform = Transform3D(1, 0, 0, 0, 1, -5.96046e-08, 0, 5.96046e-08, 1, -0.943106, 0.668839, -0.0818558)
+shape = SubResource("BoxShape3D_mjiri")
+
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.000120938, 0.970247, 0.132207)
+projection = 1
+current = true
+size = 0.2

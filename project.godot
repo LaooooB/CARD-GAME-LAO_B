@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Card_Game"
-run/main_scene="res://GAME/scenes/2D/Card_Stack_Snap_Animation/Main.tscn"
+run/main_scene="res://GAME/scenes/2D/Main.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 config/icon="res://icon.svg"
 

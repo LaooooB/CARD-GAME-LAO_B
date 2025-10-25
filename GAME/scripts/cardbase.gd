@@ -12,6 +12,13 @@ class_name Card
 @export var pickup_scale: float = 1.06
 @export var drag_z: int = 9000
 
+# ——（新增）点击判定与调试 —— 
+@export_range(0.0, 20.0, 0.5) var click_px_threshold: float = 6.0   # 判定“点击”的最大位移（像素）
+@export var click_ms_threshold: int = 220                            # 判定“点击”的最大耗时（毫秒）
+@export var click_flash_scale: float = 1.06                          # 点击时轻微闪烁的倍率
+@export var debug_log_clicks: bool = true                            # 是否打印点击日志
+@export var relay_node_name: String = "ClickDebugRelay"              # 2D 根调试中继节点名（可留默认）
+
 # =========================
 # —— 信号（标记已用） ——
 # =========================
@@ -21,6 +28,10 @@ signal drag_started(card: Card)
 signal drag_moved(card: Card, mouse_global: Vector2)
 @warning_ignore("UNUSED_SIGNAL")
 signal drag_ended(card: Card)
+
+# ——（新增）点击完成信号（可选对外用）——
+@warning_ignore("UNUSED_SIGNAL")
+signal clicked(card: Card, click_id: int)
 
 # =========================
 # —— 运行期状态 ——
@@ -44,6 +55,12 @@ var _orig_zrel: bool = true
 # 堆信息
 var _in_pile: bool = false
 var _pile_ref: Node = null
+
+# ——（新增）点击判定运行期状态 —— 
+var _press_pos_screen: Vector2 = Vector2.ZERO
+var _press_time_ms: int = 0
+var _pressing: bool = false
+var _last_bridge_click_id: int = 0   # 若装了 ClickDebugRelay，可在按下时尝试同步
 
 # =========================
 # —— 生命周期 ——
@@ -95,6 +112,20 @@ func _process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _dragging and event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_end_drag_and_drop()
+		# ===== 追加：点击判定 =====
+		if _pressing:
+			_pressing = false
+			var dt := Time.get_ticks_msec() - _press_time_ms
+			var dx := (get_viewport().get_mouse_position() - _press_pos_screen).length()
+			if dt <= click_ms_threshold and dx <= click_px_threshold:
+				_click_flash()
+				emit_signal("clicked", self, _last_bridge_click_id)
+				if debug_log_clicks:
+					print("[CARD] CLICKED card=%s id=%d dt=%d dx=%.1f" % [name, _last_bridge_click_id, dt, dx])
+				# 通知 2D 根的中继（若存在）
+				var relay := get_tree().get_root().find_child(relay_node_name, true, false)
+				if relay and relay.has_method("notify_card_clicked"):
+					relay.call("notify_card_clicked", name, _last_bridge_click_id)
 
 # =========================
 # —— 命中区事件 ——
@@ -103,12 +134,24 @@ func _on_hit_full_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> 
 	if not _interaction_enabled:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		# ===== 追加：记录按下用于点击判定 + 尝试同步 click_id =====
+		_pressing = true
+		_press_pos_screen = get_viewport().get_mouse_position()
+		_press_time_ms = Time.get_ticks_msec()
+		_try_sync_click_id()
+		# ===== 原逻辑：整面按下开始拖拽 =====
 		_on_pressed_full()
 
 func _on_hit_header_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if not _interaction_enabled:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		# ===== 追加：记录按下用于点击判定 + 尝试同步 click_id =====
+		_pressing = true
+		_press_pos_screen = get_viewport().get_mouse_position()
+		_press_time_ms = Time.get_ticks_msec()
+		_try_sync_click_id()
+		# ===== 原逻辑：点牌眉拖子栈或单卡 =====
 		_on_pressed_header()
 
 func _on_pressed_full() -> void:
@@ -230,7 +273,6 @@ func set_hit_areas(full_enabled: bool, header_enabled: bool) -> void:
 # =========================
 # —— 内部：位置/视觉/动画 ——
 # =========================
-	_ensure_anim_on_self()
 func _follow_to(target_global: Vector2) -> void:
 	if _anim != null and _anim.has_method("follow_immediate"):
 		_anim.call("follow_immediate", self, target_global)
@@ -286,3 +328,16 @@ func _ensure_anim_on_self() -> CardAnimation:
 		add_child(a)
 	_anim = a
 	return a
+
+# =====（新增）帮助函数：点击轻微闪烁 =====
+func _click_flash() -> void:
+	var tw := create_tween()
+	tw.tween_property(self, "scale", scale * click_flash_scale, 0.06)
+	tw.tween_property(self, "scale", scale, 0.08)
+
+# =====（新增）帮助函数：尝试从 2D 根中继同步 click_id（可选）=====
+func _try_sync_click_id() -> void:
+	_last_bridge_click_id = 0
+	var relay := get_tree().get_root().find_child(relay_node_name, true, false)
+	if relay and relay.has_method("get_last_bridge_click_id"):
+		_last_bridge_click_id = int(relay.call("get_last_bridge_click_id"))

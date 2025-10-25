@@ -1,0 +1,142 @@
+[gd_scene load_steps=11 format=3 uid="uid://v4eqspdh8r5a"]
+
+[ext_resource type="Script" path="res://GAME/scripts/system/pagerouter.gd" id="1_jlgi5"]
+[ext_resource type="Script" path="res://GAME/scripts/3D_2D_Bridge/Board2DInputBridge.gd" id="2_qyb20"]
+[ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/grid_manager.gd" id="2_tb0pt"]
+[ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/2D/Card_Stack_Snap_Animation/pile.tscn" id="3_25413"]
+[ext_resource type="PackedScene" uid="uid://no3sefkp5w3w" path="res://GAME/scenes/2D/cards/Crafting material/common/card_wood.tscn" id="3_80142"]
+[ext_resource type="Texture2D" uid="uid://cf3ebxbxggkyy" path="res://GAME/assets/sprites/world/1920x1080-black-solid-color-background.jpg" id="4_v43ai"]
+[ext_resource type="Texture2D" uid="uid://dfk665dtn5do3" path="res://GAME/assets/sprites/world/purple.jpg" id="6_qptsq"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_yqpyu"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p3fel"]
+resource_local_to_scene = true
+albedo_texture = SubResource("ViewportTexture_yqpyu")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_m3vta"]
+
+[node name="Main" type="Node3D"]
+
+[node name="OmniLight3D" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 42.2225, 0)
+light_energy = 100.0
+omni_range = 90.815
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.173648, 0.984808, 0, -0.984808, 0.173648, 0.712585, 33.7312, 9.38654)
+current = true
+fov = 71.2237
+
+[node name="Board_Plane" type="MeshInstance3D" parent="."]
+transform = Transform3D(38.3, 0, 0, 0, 38.3, 0, 0, 0, 21.6, 0, 0, 0)
+material_override = SubResource("StandardMaterial3D_p3fel")
+mesh = SubResource("PlaneMesh_m3vta")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+disable_3d = true
+own_world_3d = true
+transparent_bg = true
+size = Vector2i(3830, 2160)
+render_target_update_mode = 4
+
+[node name="Page_Router" type="Node" parent="SubViewport"]
+script = ExtResource("1_jlgi5")
+page_main_root = NodePath("../../Map/Main")
+tween_duration = 0.17
+tween_transition = 7
+tween_ease = 1
+
+[node name="UI" type="Node2D" parent="SubViewport"]
+
+[node name="Mechanics" type="Node" parent="SubViewport"]
+
+[node name="GridManager" type="Node2D" parent="SubViewport"]
+top_level = true
+position = Vector2(752, 620)
+script = ExtResource("2_tb0pt")
+origin = Vector2(-570, -455)
+gap = Vector2(4, 4)
+cols = 68
+rows = 27
+snap_radius_ratio = 2.0
+pile_scene = ExtResource("3_25413")
+show_grid = false
+grid_outline_width = 2.0
+blocked_outline_color = Color(0, 0, 0, 0.9)
+blocked_outline_width = 3.0
+
+[node name="Map" type="Node2D" parent="SubViewport"]
+position = Vector2(950, 540)
+
+[node name="Main" type="Node2D" parent="SubViewport/Map"]
+
+[node name="Main_map" type="Sprite2D" parent="SubViewport/Map/Main"]
+position = Vector2(3.2608, 0)
+texture = ExtResource("4_v43ai")
+
+[node name="card_wood" parent="SubViewport/Map/Main" instance=ExtResource("3_80142")]
+position = Vector2(-86, -428)
+
+[node name="Shop" type="Node2D" parent="SubViewport/Map"]
+position = Vector2(1920, 0)
+
+[node name="Shop_map" type="Sprite2D" parent="SubViewport/Map/Shop"]
+position = Vector2(3.2608, 0)
+texture = ExtResource("6_qptsq")
+
+[node name="card_wood" parent="SubViewport/Map/Shop" instance=ExtResource("3_80142")]
+position = Vector2(-86, -428)
+
+[node name="Secret" type="Node2D" parent="SubViewport/Map"]
+position = Vector2(1920, 1080)
+
+[node name="Main_map" type="Sprite2D" parent="SubViewport/Map/Secret"]
+position = Vector2(3.2608, 0)
+texture = ExtResource("4_v43ai")
+
+[node name="card_wood" parent="SubViewport/Map/Secret" instance=ExtResource("3_80142")]
+position = Vector2(-86, -428)
+
+[node name="Storage" type="Node2D" parent="SubViewport/Map"]
+position = Vector2(0, 1080)
+
+[node name="Storage_map" type="Sprite2D" parent="SubViewport/Map/Storage"]
+position = Vector2(3.2608, 0)
+texture = ExtResource("6_qptsq")
+
+[node name="card_wood" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-86, -428)
+
+[node name="card_wood2" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-160, -398)
+
+[node name="card_wood3" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-3, -424)
+
+[node name="card_wood4" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-197, -476)
+
+[node name="card_wood5" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-236, -388)
+
+[node name="card_wood6" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(45, -435)
+
+[node name="card_wood7" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-78, -347)
+
+[node name="card_wood8" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-173, -309)
+
+[node name="card_wood9" parent="SubViewport/Map/Storage" instance=ExtResource("3_80142")]
+position = Vector2(-9, -361)
+
+[node name="Bridge" type="Node2D" parent="."]
+script = ExtResource("2_qyb20")
+camera_path = NodePath("../Camera3D")
+plane_path = NodePath("../Board_Plane")
+board2d_viewport_path = NodePath("../SubViewport")
+viewport_size_pixels = Vector2i(3830, 2160)
+debug_log = true
