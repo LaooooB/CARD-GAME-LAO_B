@@ -1,8 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://no3sefkp5w3w"]
+[gd_scene load_steps=8 format=3 uid="uid://no3sefkp5w3w"]
 
 [ext_resource type="Texture2D" uid="uid://corkuu37f54so" path="res://GAME/assets/sprites/cards/1.2 Poker cards/00_1.2 Poker cards.png" id="1_p8m44"]
 [ext_resource type="Script" path="res://GAME/scripts/cardbase.gd" id="1_w4ydi"]
 [ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/card_animation.gd" id="3_3ae2l"]
+[ext_resource type="Script" path="res://GAME/scripts/shader/shader_controller.gd" id="5_xvukj"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hhjei"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_v3drd"]
 size = Vector2(47, 62)
@@ -12,6 +15,23 @@ size = Vector2(47, 9)
 
 [node name="card_wood" type="Node2D"]
 script = ExtResource("1_w4ydi")
+sprite_path = NodePath("")
+
+[node name="Shadow" type="TextureRect" parent="."]
+modulate = Color(0, 0, 0, 1)
+self_modulate = Color(0, 0, 0, 0.25098)
+offset_left = -17.0
+offset_top = -26.0
+offset_right = 30.0
+offset_bottom = 38.0
+texture = ExtResource("1_p8m44")
+
+[node name="CardTexture" type="TextureRect" parent="."]
+material = SubResource("ShaderMaterial_hhjei")
+offset_left = -23.0
+offset_top = -32.0
+offset_right = 24.0
+offset_bottom = 32.0
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = ExtResource("1_p8m44")
@@ -37,3 +57,10 @@ default_trans = 4
 bump_offset = Vector2(0, 0)
 bump_up_ratio = 0.5
 bump_total = 0.2
+
+[node name="Shadecontroller" type="Node2D" parent="."]
+script = ExtResource("5_xvukj")
+hover_scale = Vector2(1.5, 1.5)
+hover_scale_duration = 1.5
+hover_scale_trans = 10
+hover_speed_scale = 3.5

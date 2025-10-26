@@ -1,13 +1,19 @@
-[gd_scene load_steps=7 format=3 uid="uid://cc607aoh18n2o"]
+[gd_scene load_steps=8 format=3 uid="uid://cc607aoh18n2o"]
 
+[ext_resource type="Script" path="res://GAME/scripts/system/camera/camera.gd" id="1_8jnm7"]
 [ext_resource type="Script" path="res://GAME/scripts/system/pagerouter.gd" id="1_rfsmi"]
-[ext_resource type="Texture2D" uid="uid://cf3ebxbxggkyy" path="res://GAME/assets/sprites/world/1920x1080-black-solid-color-background.jpg" id="1_ubykp"]
+[ext_resource type="Texture2D" uid="uid://cl6ejqqhshn1a" path="res://GAME/assets/sprites/world/cyan.png" id="5_h3kf7"]
 [ext_resource type="Texture2D" uid="uid://dfk665dtn5do3" path="res://GAME/assets/sprites/world/purple.jpg" id="12_yokv5"]
 [ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/grid_manager.gd" id="18_0s2mq"]
 [ext_resource type="PackedScene" uid="uid://no3sefkp5w3w" path="res://GAME/scenes/2D/cards/Crafting material/common/card_wood.tscn" id="19_8ojea"]
 [ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/2D/Card_Stack_Snap_Animation/pile.tscn" id="19_isrik"]
 
 [node name="Main" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("1_8jnm7")
+
+[node name="UI" type="Node2D" parent="."]
 
 [node name="System" type="Node" parent="."]
 
@@ -18,8 +24,6 @@ tween_duration = 0.17
 tween_transition = 7
 tween_ease = 1
 
-[node name="UI" type="Node2D" parent="System"]
-
 [node name="Mechanics" type="Node" parent="System"]
 
 [node name="GridManager" type="Node2D" parent="."]
@@ -27,12 +31,10 @@ top_level = true
 position = Vector2(752, 620)
 script = ExtResource("18_0s2mq")
 origin = Vector2(-570, -455)
-gap = Vector2(4, 4)
 cols = 68
 rows = 27
 snap_radius_ratio = 2.0
 pile_scene = ExtResource("19_isrik")
-show_grid = false
 grid_outline_width = 2.0
 blocked_outline_color = Color(0, 0, 0, 0.9)
 blocked_outline_width = 3.0
@@ -43,8 +45,9 @@ position = Vector2(950, 540)
 [node name="Main" type="Node2D" parent="Map"]
 
 [node name="Main_map" type="Sprite2D" parent="Map/Main"]
-position = Vector2(3.2608, 0)
-texture = ExtResource("1_ubykp")
+position = Vector2(7.00002, 6.81877e-05)
+scale = Vector2(6.38, 6.42857)
+texture = ExtResource("5_h3kf7")
 
 [node name="card_wood" parent="Map/Main" instance=ExtResource("19_8ojea")]
 position = Vector2(-86, -428)
@@ -63,8 +66,9 @@ position = Vector2(-86, -428)
 position = Vector2(1920, 1080)
 
 [node name="Main_map" type="Sprite2D" parent="Map/Secret"]
-position = Vector2(3.2608, 0)
-texture = ExtResource("1_ubykp")
+position = Vector2(3.00001, -1.78814e-05)
+scale = Vector2(6.4, 6.42857)
+texture = ExtResource("5_h3kf7")
 
 [node name="card_wood" parent="Map/Secret" instance=ExtResource("19_8ojea")]
 position = Vector2(-86, -428)
@@ -72,7 +76,7 @@ position = Vector2(-86, -428)
 [node name="Storage" type="Node2D" parent="Map"]
 position = Vector2(0, 1080)
 
-[node name="Storage_map" type="Sprite2D" parent="Map/Storage"]
+[node name="Storage_map2" type="Sprite2D" parent="Map/Storage"]
 position = Vector2(3.2608, 0)
 texture = ExtResource("12_yokv5")
 
