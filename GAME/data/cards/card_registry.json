@@ -1,0 +1,17 @@
+[
+  {
+	"ID": 0,
+	"CARD_NAME": "Wood",
+	"CARD_TYPE": "Crafting Material",
+	"RARITY": "nigredo",
+	"SCENE_PATH": "res://GAME/scenes/2D/cards/Crafting material/common/card.tscn"
+  },
+  {
+	"ID": 1,
+	"CARD_NAME": "Stone",
+	"CARD_TYPE": "Crafting Material",
+	"RARITY": "nigredo",
+	"SCENE_PATH": "res://GAME/scenes/2D/cards/Crafting material/common/card.tscn"
+  }
+
+]

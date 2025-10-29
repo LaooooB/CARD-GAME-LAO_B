@@ -706,3 +706,27 @@ func _find_card_anim(node: Node) -> CardAnimation:
 		if child is CardAnimation:
 			return child
 	return null
+	
+	## 投放卡包到指定位置（仅做合法性判定，不占用网格）
+func drop_pack(pack: Node2D, drop_global: Vector2) -> bool:
+	var cell: int = _world_to_cell_idx(drop_global)
+	if cell == -1 and not allow_out_of_bounds:
+		emit_signal("drop_rejected", pack, "out_of_bounds")
+		return false
+	if cell != -1 and is_cell_forbidden(cell):
+		emit_signal("drop_rejected", pack, "forbidden_cell")
+		return false
+	if cell == -1 and allow_out_of_bounds:
+		emit_signal("drop_rejected", pack, "no_snap_region")
+		return false
+	# 合法即接受（让 CardPack 自己决定是否 open_on_drop_to_grid）
+	return true
+
+## （新增）将全局坐标转换为单元格索引（公开版）
+func world_to_cell_idx(world: Vector2) -> int:
+	return _world_to_cell_idx(world)
+
+## （新增）给定全局坐标，返回该点所对应单元格的中心（若无效则返回原坐标）
+func world_to_cell_center(world: Vector2) -> Vector2:
+	var cell := _world_to_cell_idx(world)
+	return get_cell_pos(cell) if cell != -1 else world

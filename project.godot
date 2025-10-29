@@ -17,7 +17,9 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-Snapregistry="res://GAME/scripts/system/snapregistry.gd"
+grid_manager="*res://GAME/scripts/Card_Stack_Snap_Animation/grid_manager.gd"
+Snapregistry="res://GAME/scripts/System/snapregistry.gd"
+Cardfactory="*res://GAME/scripts/System/cardfactory.gd"
 
 [display]
 
@@ -39,13 +41,13 @@ folder_colors={
 "res://GAME/data/": "blue",
 "res://GAME/scenes/": "yellow",
 "res://GAME/scenes/2D/Card_Stack_Snap_Animation/": "yellow",
-"res://GAME/scenes/2D/gameplay/": "yellow",
+"res://GAME/scenes/2D/Gameplay/": "yellow",
 "res://GAME/scenes/maps/": "yellow",
 "res://GAME/scenes/meta/": "yellow",
 "res://GAME/scenes/ui/": "yellow",
 "res://GAME/scripts/": "red",
-"res://GAME/scripts/gameplay/": "red",
-"res://GAME/scripts/system/": "red",
+"res://GAME/scripts/Gameplay/": "red",
+"res://GAME/scripts/System/": "red",
 "res://GAME/scripts/ui/": "red"
 }
 
@@ -72,6 +74,7 @@ ui_room_left={
 ui_room_right={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194321,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
 

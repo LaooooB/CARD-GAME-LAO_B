@@ -9,6 +9,7 @@ class_name PileManager
 @export var per_layer_z: int = 1
 @export var pickup_scale: float = 1.06
 @export var drag_z: int = 9000
+
 @export var pile_scene: PackedScene
 @export var auto_fit_header: bool = true
 @export var anim_defaults_path: NodePath   # 可选：指向一个 CardAnimation 节点作为模板
@@ -267,8 +268,7 @@ func _end_drag_and_drop() -> void:
 
 				# ① 重排（刷新 full/header 判定与 z）
 				src.reflow_visuals()
-				# ② 解禁形状 + 归属兜底（确保 Header 可拖）
-				src._ensure_whole_pile_shapes_enabled()
+				
 
 				# ③ 动效 + 刷新禁用格
 				if src._cards.size() > 0:

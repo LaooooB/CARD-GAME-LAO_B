@@ -1,0 +1,27 @@
+[gd_scene load_steps=4 format=3 uid="uid://b6qgliyxs8q1x"]
+
+[ext_resource type="Texture2D" uid="uid://dp2a6qmglld51" path="res://GAME/assets/sprites/gameplay/coine.jpg" id="1_sul5m"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/sellingarea.gd" id="2_i262p"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_mlvtn"]
+size = Vector2(119, 106)
+
+[node name="SellingArea" type="Node2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("1_sul5m")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2(-0.5, 0)
+shape = SubResource("RectangleShape2D_mlvtn")
+
+[node name="selling script" type="Node2D" parent="."]
+script = ExtResource("2_i262p")
+sell_area_path = NodePath("../Area2D")
+anim_duration = 0.51
+anim_trans = 10
+anim_ease = 1
+reject_bump_distance = 25.0

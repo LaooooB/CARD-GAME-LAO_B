@@ -118,7 +118,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			var dt := Time.get_ticks_msec() - _press_time_ms
 			var dx := (get_viewport().get_mouse_position() - _press_pos_screen).length()
 			if dt <= click_ms_threshold and dx <= click_px_threshold:
-				_click_flash()
 				emit_signal("clicked", self, _last_bridge_click_id)
 				if debug_log_clicks:
 					print("[CARD] CLICKED card=%s id=%d dt=%d dx=%.1f" % [name, _last_bridge_click_id, dt, dx])
@@ -328,12 +327,6 @@ func _ensure_anim_on_self() -> CardAnimation:
 		add_child(a)
 	_anim = a
 	return a
-
-# =====（新增）帮助函数：点击轻微闪烁 =====
-func _click_flash() -> void:
-	var tw := create_tween()
-	tw.tween_property(self, "scale", scale * click_flash_scale, 0.06)
-	tw.tween_property(self, "scale", scale, 0.08)
 
 # =====（新增）帮助函数：尝试从 2D 根中继同步 click_id（可选）=====
 func _try_sync_click_id() -> void:
