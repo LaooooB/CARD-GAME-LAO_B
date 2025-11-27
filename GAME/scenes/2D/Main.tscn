@@ -1,5 +1,6 @@
-[gd_scene load_steps=19 format=3 uid="uid://cc607aoh18n2o"]
+[gd_scene load_steps=20 format=3 uid="uid://cc607aoh18n2o"]
 
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/main_enter_tween.gd" id="1_6kk05"]
 [ext_resource type="Script" path="res://GAME/scripts/System/camera/camera.gd" id="1_8jnm7"]
 [ext_resource type="Script" path="res://GAME/scripts/Gameplay/Economy/coinhud.gd" id="2_5appd"]
 [ext_resource type="Script" path="res://GAME/scripts/System/cardfactory.gd" id="2_fykw1"]
@@ -25,23 +26,34 @@ size = Vector2(119, 106)
 
 [node name="Main" type="Node2D"]
 
+[node name="Main Enter Tween" type="Node2D" parent="."]
+script = ExtResource("1_6kk05")
+fade_in_duration = 0.4
+fade_in_color = Color(0.313726, 0.113725, 0, 0.913725)
+fade_in_ease = 0
+
 [node name="UI Canvas" type="CanvasLayer" parent="."]
 
 [node name="UI" type="Control" parent="UI Canvas"]
 layout_mode = 3
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+anchor_right = 0.021
+anchor_bottom = 0.037
+offset_right = -0.320004
+offset_bottom = 0.0400009
 
 [node name="Resource UI" type="Control" parent="UI Canvas/UI"]
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="Coin UI" type="PanelContainer" parent="UI Canvas/UI/Resource UI"]
-layout_mode = 0
-offset_right = 172.0
-offset_bottom = 40.0
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 4.3
+anchor_bottom = 1.0
 
 [node name="Coin UI" type="MarginContainer" parent="UI Canvas/UI/Resource UI/Coin UI"]
 layout_mode = 2
@@ -60,17 +72,19 @@ script = ExtResource("2_5appd")
 coin_model_path = NodePath("../../../../../../../System/Economy/Coin_Model")
 
 [node name="Work Unit UI" type="Control" parent="UI Canvas/UI"]
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="Card Counter UI" type="PanelContainer" parent="UI Canvas/UI"]
 layout_mode = 1
-anchors_preset = 2
+anchors_preset = -1
 anchor_top = 1.0
-anchor_bottom = 1.0
-offset_right = 172.0
-offset_bottom = 39.0
+anchor_right = 4.3
+anchor_bottom = 1.975
 grow_vertical = 0
 
 [node name="Card Counter UI" type="MarginContainer" parent="UI Canvas/UI/Card Counter UI"]

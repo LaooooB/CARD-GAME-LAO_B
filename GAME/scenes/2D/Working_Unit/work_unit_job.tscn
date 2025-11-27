@@ -9,13 +9,14 @@
 z_index = 100
 z_as_relative = false
 layout_mode = 3
-anchor_right = 0.054
-anchor_bottom = 0.088
+anchor_right = 0.0753542
+anchor_bottom = 0.128741
 offset_right = -0.68
 offset_bottom = -0.0400085
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_b40tq")
+metadata/_edit_use_anchors_ = true
 
 [node name="Shadow" type="TextureRect" parent="."]
 modulate = Color(0, 0, 0, 1)
