@@ -281,30 +281,30 @@ func _spawn_then_vanish_if_success() -> void:
 	var requested: int = spawn_count
 	var allowed: int = requested
 
-	# —— 尝试用 CardLimitManager 限制生成数量 —— 
 	var limit_mgr: Node = _get_card_limit_manager()
 	if limit_mgr != null:
-		# 先重算一次当前场上卡牌数量（只在这里扫描，不再定时扫）
-		if limit_mgr.has_method("recalculate_from_board"):
-			limit_mgr.call("recalculate_from_board")
-
-		var cur: int = int(limit_mgr.get("current_card_count"))
-		var cap: int = int(limit_mgr.get("max_card_capacity"))
-		var free: int = cap - cur
-
-		if free <= 0:
-			allowed = 0
-		else:
-			allowed = min(requested, free)
+		# —— 先算还能放几张 —— 
+		var free: int = 0
+		if limit_mgr.has_method("get_free_slots"):
+			free = int(limit_mgr.call("get_free_slots"))
+		elif limit_mgr.has_method("can_spawn"):
+			# 退一步：只能全有全无
+			if not bool(limit_mgr.call("can_spawn", requested)):
+				free = 0
+			else:
+				free = requested
+		
+		free = max(free, 0)
+		allowed = min(requested, free)
 
 	if allowed <= 0:
-		# 容量已满：不生成，也不消失，还原交互
+		# 容量满了：不生成，也不消失
 		set_interaction_enabled(true)
 		if debug_log:
 			push_warning("[CardPack] capacity full, no cards spawned.")
 		return
 
-	# —— 只生成 allowed 张，其余的“被cap住” —— 
+	# —— 实际生成 allowed 张 —— 
 	var spawned: int = _spawn_cards_from_blueprints(allowed, spawn_card_names)
 	if spawned <= 0:
 		set_interaction_enabled(true)
@@ -312,12 +312,12 @@ func _spawn_then_vanish_if_success() -> void:
 			push_warning("[CardPack] spawn failed; check blueprints, CARD_NAME filter, or SCENE_PATH.")
 		return
 
+	# —— 生成成功：把本次 +spawned 记入 CardLimitManager —— 
+	if limit_mgr != null and spawned > 0 and limit_mgr.has_method("add_cards"):
+		limit_mgr.call("add_cards", spawned)
+
 	if debug_log and spawned < requested:
 		print("[CardPack] spawned ", spawned, "/", requested, " due to capacity limit.")
-
-	# 生成完再重算一次，让 UI / 其它逻辑拿到最新数量
-	if limit_mgr != null and limit_mgr.has_method("recalculate_from_board"):
-		limit_mgr.call("recalculate_from_board")
 
 	await _vanish_now()
 

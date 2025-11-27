@@ -5,6 +5,8 @@ class_name CardCounterUI
 @export var autoload_name: String = "CardLimitManager"
 
 var _mgr: Node = null
+var _last_cur: int = -1
+var _last_cap: int = -1
 
 
 func _ready() -> void:
@@ -21,26 +23,37 @@ func _ready() -> void:
 		push_error("[CardCounterUI] node at %s has no signal 'card_count_changed'" % str(path))
 		return
 	
-	# 初始化文本
+	# 初始化文本（从 Manager 当前值读一次）
 	var cur: int = int(_mgr.get("current_card_count"))
 	var cap: int = int(_mgr.get("max_card_capacity"))
+	_last_cur = cur
+	_last_cap = cap
 	text = "%d / %d" % [cur, cap]
 	
 	_mgr.connect("card_count_changed", Callable(self, "_on_card_count_changed"))
+	set_process(true)  # 开启 _process 兜底刷新
 	
 	if debug_log:
 		print("[CardCounterUI] connected to", str(path))
 
 
 func _on_card_count_changed(current: int, max: int) -> void:
+	_last_cur = current
+	_last_cap = max
 	text = "%d / %d" % [current, max]
 
-	# 这里你以后可以加一些“快满了就变色”的逻辑，现在先留空
-	# 例如：
-	# var ratio := (max > 0) ? float(current) / float(max) : 0.0
-	# if ratio >= 1.0:
-	#     self_modulate = Color(1, 0.3, 0.3)  # 满载变红
-	# elif ratio >= 0.9:
-	#     self_modulate = Color(1, 0.7, 0.3)  # 接近满载变黄
-	# else:
-	#     self_modulate = Color(1, 1, 1)      # 正常
+
+func _process(_delta: float) -> void:
+	if _mgr == null:
+		return
+	
+	# 每帧从 Manager 读一次数值，如果发现有变化就更新 UI
+	var cur: int = int(_mgr.get("current_card_count"))
+	var cap: int = int(_mgr.get("max_card_capacity"))
+	
+	if cur != _last_cur or cap != _last_cap:
+		_last_cur = cur
+		_last_cap = cap
+		text = "%d / %d" % [cur, cap]
+		if debug_log:
+			print("[CardCounterUI] polled update:", cur, "/", cap)

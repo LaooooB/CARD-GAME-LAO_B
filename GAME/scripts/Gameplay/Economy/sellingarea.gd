@@ -201,47 +201,83 @@ func _reject_drop(node2d: Node2D) -> void:
 
 # —— 出售实现（计价 + 加币 + 删除）—— 
 func _perform_sell(candidates: Array) -> void:
-	# 统一去重
-	var uniq: Array = []
+	# ========== 1. 去重 + 过滤无效 / 已锁对象 ==========
+	var clicked_cards: Array[Node2D] = []
 	for n in candidates:
-		if uniq.find(n) == -1:
-			uniq.append(n)
-
-	# 结束交互、通知引用方
-	for n in uniq:
-		if n is Node2D and is_instance_valid(n):
-			_pre_sell_cleanup(n as Node2D)
-
-	# 确定最终删除对象（单卡或整堆）
-	var final_targets: Array = []
-	for n2 in uniq:
-		if not (n2 is Node2D) or not is_instance_valid(n2):
+		var c: Node2D = n as Node2D
+		if c == null or not is_instance_valid(c):
 			continue
-		var target: Node2D = n2
-		if delete_entire_pile_if_grouped:
-			var pile: Node2D = _find_pile_root(n2)
-			if pile != null:
-				target = pile
-		if final_targets.find(target) == -1:
-			final_targets.append(target)
+		if c.has_meta("_selling_locked") and bool(c.get_meta("_selling_locked")):
+			continue
+		if clicked_cards.find(c) == -1:
+			clicked_cards.append(c)
 
-	# 价值结算
-	var grand_total: int = 0
-	var total_count_cards: int = 0
-	for tgt in final_targets:
-		var cards: Array = _collect_cards_for_value(tgt)
-		total_count_cards += cards.size()
-		for c in cards:
-			grand_total += _read_value(c)
-
-	if debug_log:
-		print("[SellingArea] READY TO SELL: targets=", final_targets.size(), " cards=", total_count_cards, " total=", grand_total)
-
-	if grand_total <= 0 and not allow_sell_zero_value:
-		if debug_log: print("[SellingArea] total<=0, skip sell.")
+	if clicked_cards.is_empty():
 		return
 
-	# 金币加成
+	# ========== 2. 先对点击到的每个节点做一次预清理（停拖拽、通知 Recipe/Pile 等）==========
+	for c in clicked_cards:
+		_pre_sell_cleanup(c)
+
+	# ========== 3. 按“所属堆”分组 ==========
+	# key: 堆根(Node2D，可能为 null 表示散卡)
+	# val: 这个堆里被点击到的那几张卡
+	var pile_to_touched: Dictionary = {}
+	for c in clicked_cards:
+		var pile_root: Node2D = _find_pile_root(c)
+		var key: Variant = pile_root  # 字典 key 直接用对象
+		if not pile_to_touched.has(key):
+			pile_to_touched[key] = []
+		(pile_to_touched[key] as Array).append(c)
+
+	# ========== 4. 从这些堆里，扩展出“真正要卖掉的所有卡牌” ==========
+	# 规则：
+	#   - 如果能找到 pile_root 且有 get_cards() → 整堆所有 get_cards() 都卖
+	#   - 否则 → 只卖被点中的那几张
+	var sold_cards: Array[Node2D] = []
+	for key in pile_to_touched.keys():
+		var pile_root: Node2D = key as Node2D
+		if pile_root != null and is_instance_valid(pile_root) and pile_root.has_method("get_cards"):
+			var arr_any: Variant = pile_root.call("get_cards")
+			if typeof(arr_any) == TYPE_ARRAY:
+				for v in (arr_any as Array):
+					var card2: Node2D = v as Node2D
+					if card2 != null and is_instance_valid(card2):
+						if sold_cards.find(card2) == -1:
+							sold_cards.append(card2)
+		else:
+			# 没有堆信息 → 只卖点击到的那几张散卡
+			var touched: Array = pile_to_touched[key]
+			for v2 in touched:
+				var c2: Node2D = v2 as Node2D
+				if c2 != null and is_instance_valid(c2):
+					if sold_cards.find(c2) == -1:
+						sold_cards.append(c2)
+
+	if sold_cards.is_empty():
+		return
+
+	# ========== 5. 计算总价值 ==========
+	var grand_total: int = 0
+	for c in sold_cards:
+		grand_total += _read_value(c)
+
+	if grand_total <= 0 and not allow_sell_zero_value:
+		if debug_log:
+			print("[SellingArea] total<=0, skip sell. cards=", sold_cards.size())
+		return
+
+	# ========== 6. 给这批要卖的卡打上“正在出售”锁，防止 tween 期间被再次出售 ==========
+	for c in sold_cards:
+		if c != null and is_instance_valid(c):
+			c.set_meta("_selling_locked", true)
+
+	# ========== 7. 同步 CardLimitManager：本次一共卖掉多少张卡 ==========
+	var mgr := _get_card_limit_manager()
+	if mgr != null and mgr.has_method("remove_cards"):
+		mgr.call("remove_cards", sold_cards.size())
+
+	# ========== 8. 加钱 ==========
 	if _coin_model != null and _coin_model.has_method("add"):
 		_coin_model.call("add", grand_total)
 		if debug_log and _coin_model.has_method("get_amount"):
@@ -250,20 +286,23 @@ func _perform_sell(candidates: Array) -> void:
 	else:
 		push_warning("[SellingArea] CoinModel 未绑定或缺少 add(amount) 方法，跳过加币。")
 
-	# 删除（带动画或秒删）
+	# ========== 9. 播放动画并删除“卡牌本身”，不直接删 PileManager ==========
 	var sold_nodes: Array = []
-	for target in final_targets:
-		if sold_nodes.find(target) == -1:
-			sold_nodes.append(target)
+	for c in sold_cards:
+		if c == null or not is_instance_valid(c):
+			continue
 		if anim_enabled:
-			_play_tween_and_free(target)
+			_play_tween_and_free(c)
 		else:
-			_queue_free_immediately(target)
+			_queue_free_immediately(c)
+		sold_nodes.append(c)
 
 	if not sold_nodes.is_empty():
 		emit_signal("sold", sold_nodes)
 
 	_overlapping_cards.clear()
+
+
 
 # —— 预清理：结束拖拽、取消选中、通知 Grid/Pile、可选 reparent 隔离 —— 
 func _pre_sell_cleanup(node2d: Node2D) -> void:
@@ -399,11 +438,24 @@ func _guess_card_root_from_body(b: Node) -> Node2D:
 	return null
 
 func _find_pile_root(n: Node) -> Node2D:
+	if n == null or not is_instance_valid(n):
+		return null
+
+	# 优先：卡本身有 get_pile（和 PileManager 对齐）
+	if n.has_method("get_pile"):
+		var p_any: Variant = n.call("get_pile")
+		if typeof(p_any) == TYPE_OBJECT:
+			var p_node: Node2D = p_any as Node2D
+			if p_node != null and is_instance_valid(p_node):
+				return p_node
+
+	# 退一步：往父节点爬，找 PileManager
 	var cur: Node = n
 	while cur != null:
-		if cur is Node2D and String(cur.name).to_lower().contains("pile"):
+		if cur is PileManager:
 			return cur as Node2D
 		cur = cur.get_parent()
+
 	return null
 
 # ====== 计价相关（兼容蓝图 VALUE 与 metadata） ======
@@ -413,18 +465,43 @@ func _find_pile_root(n: Node) -> Node2D:
 # - 单卡 → [card]
 # - 其他节点 → 遍历子节点找“像卡”的
 func _collect_cards_for_value(target: Node) -> Array:
-	if target == null or not is_instance_valid(target):
-		return []
-	if target.has_method("get_cards"):
-		var arr = target.call("get_cards")
-		if typeof(arr) == TYPE_ARRAY:
-			return arr
-	if _looks_like_card(target):
-		return [target]
 	var out: Array = []
+	if target == null or not is_instance_valid(target):
+		return out
+
+	# ----- 情况 1：target 本身是卡牌，先看它属于哪个 pile -----
+	if target.has_method("get_pile"):
+		var p_any: Variant = target.call("get_pile")
+		if typeof(p_any) == TYPE_OBJECT:
+			var p_node: Node = p_any
+			if p_node != null and is_instance_valid(p_node) and p_node.has_method("get_cards"):
+				var arr_any: Variant = p_node.call("get_cards")
+				if typeof(arr_any) == TYPE_ARRAY:
+					for v in (arr_any as Array):
+						var c: Node2D = v as Node2D
+						if c != null and is_instance_valid(c):
+							out.append(c)
+				return out  # 已经按整堆返回了
+
+	# ----- 情况 2：target 自己就是堆（PileManager） -----
+	if target.has_method("get_cards"):
+		var arr_any2: Variant = target.call("get_cards")
+		if typeof(arr_any2) == TYPE_ARRAY:
+			for v2 in (arr_any2 as Array):
+				var c2: Node2D = v2 as Node2D
+				if c2 != null and is_instance_valid(c2):
+					out.append(c2)
+		return out
+
+	# ----- 情况 3：兼容旧逻辑：单节点 / 容器节点 -----
+	if _looks_like_card(target):
+		out.append(target)
+		return out
+
 	for child in target.get_children():
-		if _looks_like_card(child):
+		if child is Node and is_instance_valid(child) and _looks_like_card(child):
 			out.append(child)
+
 	return out
 
 # 宽松判断：是否“像一张卡”
@@ -518,3 +595,9 @@ func _read_value(card: Node) -> int:
 	if debug_log:
 		print("[SellingArea] missing VALUE on card:", card)
 	return 0
+
+func _get_card_limit_manager() -> Node:
+	var root := get_tree().get_root()
+	if root.has_node(^"/root/CardLimitManager"):
+		return root.get_node(^"/root/CardLimitManager")
+	return null

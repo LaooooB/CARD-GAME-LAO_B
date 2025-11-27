@@ -218,4 +218,3 @@ position = Vector2(49, 914)
 
 [node name="Card Counter" type="Node2D" parent="System"]
 script = ExtResource("16_fneu7")
-board_root_path = NodePath("../../Map")

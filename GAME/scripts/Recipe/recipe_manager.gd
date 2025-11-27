@@ -545,6 +545,13 @@ func _on_cancel_by_interaction(_arg: Variant = null) -> void:
 func _finish_execute_craft(pile2d: Node2D, out_name_raw: String, scene_path: String, center: Vector2) -> void:
 	_is_crafting_now = true
 
+	# —— 先算这次合成会消耗几张牌 —— 
+	var consumed_count: int = 0
+	if pile2d != null and is_instance_valid(pile2d) and pile2d.has_method("get_cards"):
+		var arr_any: Variant = pile2d.call("get_cards")
+		if typeof(arr_any) == TYPE_ARRAY:
+			consumed_count = (arr_any as Array).size()
+
 	var parent: Node = pile2d.get_parent()
 	_delete_pile_safe(pile2d)
 
@@ -576,8 +583,13 @@ func _finish_execute_craft(pile2d: Node2D, out_name_raw: String, scene_path: Str
 
 	_is_crafting_now = false
 
-	# —— 合成会删掉旧卡、加一张新卡：请求 CardLimitManager 在本帧稍后重算一次 —— 
-	_request_limit_recalc()
+	# —— 精确更新卡牌数量：-消耗的N张 + 新的1张 —— 
+	var mgr := _get_card_limit_manager()
+	if mgr != null:
+		if consumed_count > 0 and mgr.has_method("remove_cards"):
+			mgr.call("remove_cards", consumed_count)
+		if mgr.has_method("add_cards"):
+			mgr.call("add_cards", 1)
 
 
 # ================== Bag / 签名 ==================
