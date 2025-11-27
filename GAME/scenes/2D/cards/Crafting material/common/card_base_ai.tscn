@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://71vyd5qsdxiw"]
+[gd_scene load_steps=8 format=3 uid="uid://beh130qc12obq"]
 
 [ext_resource type="Script" path="res://GAME/scripts/cardbase.gd" id="1_whp7a"]
 [ext_resource type="Texture2D" uid="uid://c7anhgn2t24im" path="res://GAME/assets/sprites/cards/cardbase.png" id="2_jn6bm"]
@@ -10,10 +10,11 @@
 size = Vector2(48, 62)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_aa87d"]
-size = Vector2(47, 9)
+size = Vector2(47, 19)
 
 [node name="card" type="Node2D"]
 script = ExtResource("1_whp7a")
+internal_z_names = Array[String](["NameLabel"])
 
 [node name="card_animation" type="Node2D" parent="."]
 visible = false
@@ -49,20 +50,33 @@ shape = SubResource("RectangleShape2D_v3drd")
 [node name="hit_header" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="hit_header"]
-position = Vector2(0.5, -26.5)
+position = Vector2(0.5, -21.5)
 shape = SubResource("RectangleShape2D_aa87d")
 debug_color = Color(0.69703, 0.421901, 0.676464, 0.42)
 
 [node name="Shadecontroller" type="Node2D" parent="."]
 script = ExtResource("4_5urhx")
-hover_scale = Vector2(1.5, 1.5)
-hover_scale_duration = 1.5
+hover_scale = Vector2(1.45, 1.45)
+pile_hover_scale = Vector2(1.2, 1.2)
+hover_scale_duration = 1.6
 hover_scale_trans = 10
 hover_speed_scale = 3.5
+drag_shrink_duration = 0.1
+drag_shrink_trans = 8
+drag_shrink_ease = 2
 
 [node name="NameLabel" type="Label" parent="."]
+z_index = 10
+z_as_relative = false
+anchors_preset = -1
+anchor_left = -0.012
+anchor_top = -0.029
+anchor_right = 0.013
 offset_left = -23.0
 offset_top = -31.0
 offset_right = 25.0
-offset_bottom = -8.0
-text = "123"
+offset_bottom = -8.66667
+size_flags_horizontal = 0
+size_flags_vertical = 0
+horizontal_alignment = 1
+vertical_alignment = 1

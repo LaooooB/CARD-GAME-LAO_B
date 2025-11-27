@@ -1,0 +1,7 @@
+[
+  {
+	"PACK_NAME": "Common pack",
+	"VALUE": 3,
+	"SCENE_PATH": "res://GAME/scenes/2D/card_packs/cardpack.tscn"
+  }
+]

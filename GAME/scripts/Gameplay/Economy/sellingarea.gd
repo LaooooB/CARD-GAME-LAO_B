@@ -3,6 +3,11 @@ class_name SellingArea
 
 @export var sell_area_path: NodePath
 
+# —— 绑定 CoinModel（非 Autoload）——
+@export var coin_model_path: NodePath
+@export var auto_find_coin_by_group: bool = true
+@export var coin_model_group: String = "coin_model"
+
 # —— 动画参数 —— 
 @export var anim_enabled: bool = true
 @export_range(0.05, 1.0, 0.01) var anim_duration: float = 0.18
@@ -16,6 +21,10 @@ class_name SellingArea
 @export var only_on_left_button: bool = true
 @export var delete_entire_pile_if_grouped: bool = false
 
+# —— 售价策略 —— 
+@export var allow_sell_zero_value: bool = true   # 允许总价为 0 时也删除（丢弃）
+@export var debug_log: bool = false
+
 # —— CardPack 拒收设置 —— 
 @export var reject_card_pack: bool = true
 @export var reject_to_marker: NodePath
@@ -27,11 +36,11 @@ class_name SellingArea
 # —— 影子/额外节点同步销毁 —— 
 @export var extra_kill_paths: Array[NodePath] = []
 
-# —— 新增：删除前隔离与通知的策略 —— 
+# —— 删除前隔离与通知策略 —— 
 @export var reparent_before_delete: bool = true                  # 删除前把节点移到 SellingArea 下
 @export var notify_grid_groups: PackedStringArray = ["grid_manager", "snap_manager"]
 @export var notify_pile_groups: PackedStringArray = ["pile_manager"]
-@export var notify_methods_single: PackedStringArray = [         # 尝试这些方法名（有哪个就调用哪个）
+@export var notify_methods_single: PackedStringArray = [
 	"on_card_will_be_sold",
 	"on_node_will_be_sold",
 	"on_pile_will_be_sold",
@@ -48,6 +57,7 @@ signal sold(nodes: Array)
 
 var _sell_area: Area2D
 var _overlapping_cards: Dictionary = {}   # {Node2D: true}
+var _coin_model: Node = null
 
 func _ready() -> void:
 	_sell_area = get_node_or_null(sell_area_path) as Area2D
@@ -61,6 +71,14 @@ func _ready() -> void:
 	_sell_area.body_exited.connect(_on_body_exited)
 
 	_overlapping_cards.clear()
+
+	# 绑定 CoinModel（非 Autoload）
+	if coin_model_path != NodePath(""):
+		_coin_model = get_node_or_null(coin_model_path)
+	if _coin_model == null and auto_find_coin_by_group:
+		_coin_model = get_tree().get_first_node_in_group(coin_model_group)
+	if _coin_model == null:
+		push_warning("[SellingArea] 未找到 CoinModel。请设置 coin_model_path，或将 CoinModel 节点加入组 '%s'。" % coin_model_group)
 
 func _on_area_entered(a: Area2D) -> void:
 	var card: Node2D = _guess_card_root_from_area(a)
@@ -181,7 +199,7 @@ func _reject_drop(node2d: Node2D) -> void:
 	t4.set_ease(reject_ease)
 	t4.tween_property(node2d, "global_position", target, reject_anim_duration)
 
-# —— 出售实现（新增：删除前脱钩与通知）—— 
+# —— 出售实现（计价 + 加币 + 删除）—— 
 func _perform_sell(candidates: Array) -> void:
 	# 统一去重
 	var uniq: Array = []
@@ -189,13 +207,13 @@ func _perform_sell(candidates: Array) -> void:
 		if uniq.find(n) == -1:
 			uniq.append(n)
 
-	# 先做预清理（脱离拖拽、从 Pile/Grid 解除、通知管理器清引用）
+	# 结束交互、通知引用方
 	for n in uniq:
 		if n is Node2D and is_instance_valid(n):
 			_pre_sell_cleanup(n as Node2D)
 
-	# 动画并安全释放
-	var sold_nodes: Array = []
+	# 确定最终删除对象（单卡或整堆）
+	var final_targets: Array = []
 	for n2 in uniq:
 		if not (n2 is Node2D) or not is_instance_valid(n2):
 			continue
@@ -204,9 +222,43 @@ func _perform_sell(candidates: Array) -> void:
 			var pile: Node2D = _find_pile_root(n2)
 			if pile != null:
 				target = pile
-		_play_tween_and_free(target)
+		if final_targets.find(target) == -1:
+			final_targets.append(target)
+
+	# 价值结算
+	var grand_total: int = 0
+	var total_count_cards: int = 0
+	for tgt in final_targets:
+		var cards: Array = _collect_cards_for_value(tgt)
+		total_count_cards += cards.size()
+		for c in cards:
+			grand_total += _read_value(c)
+
+	if debug_log:
+		print("[SellingArea] READY TO SELL: targets=", final_targets.size(), " cards=", total_count_cards, " total=", grand_total)
+
+	if grand_total <= 0 and not allow_sell_zero_value:
+		if debug_log: print("[SellingArea] total<=0, skip sell.")
+		return
+
+	# 金币加成
+	if _coin_model != null and _coin_model.has_method("add"):
+		_coin_model.call("add", grand_total)
+		if debug_log and _coin_model.has_method("get_amount"):
+			var after := int(_coin_model.call("get_amount"))
+			print("[SellingArea] COIN +", grand_total, " => ", after)
+	else:
+		push_warning("[SellingArea] CoinModel 未绑定或缺少 add(amount) 方法，跳过加币。")
+
+	# 删除（带动画或秒删）
+	var sold_nodes: Array = []
+	for target in final_targets:
 		if sold_nodes.find(target) == -1:
 			sold_nodes.append(target)
+		if anim_enabled:
+			_play_tween_and_free(target)
+		else:
+			_queue_free_immediately(target)
 
 	if not sold_nodes.is_empty():
 		emit_signal("sold", sold_nodes)
@@ -228,7 +280,7 @@ func _pre_sell_cleanup(node2d: Node2D) -> void:
 	# 2) 通知 Pile / Grid 管理器清引用（单个）
 	_notify_managers_single(node2d)
 
-	# 3) 可选：reparent 到 SellingArea，隔离与原父节点的依赖（避免同帧逻辑继续访问）
+	# 3) 可选：reparent 到 SellingArea，隔离与原父节点依赖
 	if reparent_before_delete and node2d.get_parent() != self:
 		var keep_global: Vector2 = node2d.global_position
 		var keep_rot: float = node2d.global_rotation
@@ -253,7 +305,7 @@ func _notify_managers_single(target: Node2D) -> void:
 				if m.has_method(method_name):
 					m.call(method_name, target)
 
-# —— 批量通知（目前未用到；保留以备扩展）——
+# —— 批量通知（备用）——
 func _notify_managers_batch(nodes: Array) -> void:
 	var groups_all: Array = []
 	groups_all.append_array(notify_grid_groups)
@@ -264,7 +316,7 @@ func _notify_managers_batch(nodes: Array) -> void:
 				if m.has_method(method_name):
 					m.call(method_name, nodes)
 
-# —— 动画 + 安全释放（统一对所有 CanvasItem 子树 + 额外节点）——
+# —— 动画 + 安全释放 —— 
 func _play_tween_and_free(target: Node2D) -> void:
 	var tween: Tween = create_tween()
 	tween.set_trans(anim_trans)
@@ -299,10 +351,14 @@ func _play_tween_and_free(target: Node2D) -> void:
 
 	tween.finished.connect(func () -> void:
 		if is_instance_valid(target):
-			# 用 deferred 规避“同帧仍被访问”
 			target.call_deferred("queue_free")
 		_free_extra_nodes_safe_deferred()
 	)
+
+# —— 无动画直接释放 —— 
+func _queue_free_immediately(target: Node2D) -> void:
+	_free_extra_nodes_safe_deferred()
+	target.call_deferred("queue_free")
 
 func _collect_canvas_items(root: Node) -> Array:
 	var out: Array = []
@@ -349,3 +405,116 @@ func _find_pile_root(n: Node) -> Node2D:
 			return cur as Node2D
 		cur = cur.get_parent()
 	return null
+
+# ====== 计价相关（兼容蓝图 VALUE 与 metadata） ======
+
+# 收集用于计价的卡列表：
+# - 堆（有 get_cards）→ 全部卡
+# - 单卡 → [card]
+# - 其他节点 → 遍历子节点找“像卡”的
+func _collect_cards_for_value(target: Node) -> Array:
+	if target == null or not is_instance_valid(target):
+		return []
+	if target.has_method("get_cards"):
+		var arr = target.call("get_cards")
+		if typeof(arr) == TYPE_ARRAY:
+			return arr
+	if _looks_like_card(target):
+		return [target]
+	var out: Array = []
+	for child in target.get_children():
+		if _looks_like_card(child):
+			out.append(child)
+	return out
+
+# 宽松判断：是否“像一张卡”
+# - 直接字段 value / VALUE
+# - card_data（属性或 meta）含 value / VALUE
+# - meta: card_row 含 value / VALUE
+func _looks_like_card(node: Node) -> bool:
+	if node == null:
+		return false
+
+	if typeof(node.get("value")) != TYPE_NIL:
+		return true
+	if typeof(node.get("VALUE")) != TYPE_NIL:
+		return true
+
+	var cd = node.get("card_data")
+	if cd != null:
+		if typeof(cd) == TYPE_DICTIONARY:
+			if cd.has("value") or cd.has("VALUE"):
+				return true
+		else:
+			if typeof(cd.get("value")) != TYPE_NIL or typeof(cd.get("VALUE")) != TYPE_NIL:
+				return true
+
+	if node.has_meta("card_data"):
+		var md = node.get_meta("card_data")
+		if typeof(md) == TYPE_DICTIONARY and (md.has("value") or md.has("VALUE")):
+			return true
+	if node.has_meta("card_row"):
+		var mr = node.get_meta("card_row")
+		if typeof(mr) == TYPE_DICTIONARY and (mr.has("value") or mr.has("VALUE")):
+			return true
+
+	return false
+
+# 读取卡的价值，优先级：
+# 1) card.value / card.VALUE
+# 2) card.card_data（属性 Dictionary/对象）里的 value / VALUE
+# 3) metadata: card_data / card_row 里的 value / VALUE
+func _read_value(card: Node) -> int:
+	var v = card.get("value")
+	if typeof(v) == TYPE_INT:   return max(0, v)
+	if typeof(v) == TYPE_FLOAT: return max(0, int(round(v)))
+	v = card.get("VALUE")
+	if typeof(v) == TYPE_INT:   return max(0, v)
+	if typeof(v) == TYPE_FLOAT: return max(0, int(round(v)))
+
+	var cd = card.get("card_data")
+	if cd != null:
+		if typeof(cd) == TYPE_DICTIONARY:
+			if cd.has("value"):
+				var vv = cd["value"]
+				if typeof(vv) == TYPE_INT:   return max(0, vv)
+				if typeof(vv) == TYPE_FLOAT: return max(0, int(round(vv)))
+			if cd.has("VALUE"):
+				var vV = cd["VALUE"]
+				if typeof(vV) == TYPE_INT:   return max(0, vV)
+				if typeof(vV) == TYPE_FLOAT: return max(0, int(round(vV)))
+		else:
+			var vv2 = cd.get("value")
+			if typeof(vv2) == TYPE_INT:   return max(0, vv2)
+			if typeof(vv2) == TYPE_FLOAT: return max(0, int(round(vv2)))
+			var vV2 = cd.get("VALUE")
+			if typeof(vV2) == TYPE_INT:   return max(0, vV2)
+			if typeof(vV2) == TYPE_FLOAT: return max(0, int(round(vV2)))
+
+	if card.has_meta("card_data"):
+		var md = card.get_meta("card_data")
+		if typeof(md) == TYPE_DICTIONARY:
+			if md.has("value"):
+				var mv = md["value"]
+				if typeof(mv) == TYPE_INT:   return max(0, mv)
+				if typeof(mv) == TYPE_FLOAT: return max(0, int(round(mv)))
+			if md.has("VALUE"):
+				var mV = md["VALUE"]
+				if typeof(mV) == TYPE_INT:   return max(0, mV)
+				if typeof(mV) == TYPE_FLOAT: return max(0, int(round(mV)))
+
+	if card.has_meta("card_row"):
+		var mr = card.get_meta("card_row")
+		if typeof(mr) == TYPE_DICTIONARY:
+			if mr.has("value"):
+				var r1 = mr["value"]
+				if typeof(r1) == TYPE_INT:   return max(0, r1)
+				if typeof(r1) == TYPE_FLOAT: return max(0, int(round(r1)))
+			if mr.has("VALUE"):
+				var r2 = mr["VALUE"]
+				if typeof(r2) == TYPE_INT:   return max(0, r2)
+				if typeof(r2) == TYPE_FLOAT: return max(0, int(round(r2)))
+
+	if debug_log:
+		print("[SellingArea] missing VALUE on card:", card)
+	return 0

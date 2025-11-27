@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3 uid="uid://b671352crc2xy"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Recipe/recipe_manager.gd" id="1_6elyf"]
+
+[node name="RecipeManager" type="Node2D"]
+script = ExtResource("1_6elyf")
+recipe_files = Array[String](["res://GAME/data/recipes/recipe_blueprint.json"])
+card_blueprints_file = "res://GAME/data/cards/card_blueprint.json"
+debug_log = true
+craft_delay_sec = 10.0
+fx_total_sec = 3.0
+fx_glow_peak_sec = 0.84
+fx_glow_fade_sec = 0.6
+fx_newcard_appear_sec = 1.25
+fx_jitter_px = 5.0
+fx_glow_color = Color(0.827483, 0.616328, 1.92523e-06, 0.9)
+fx_trail_alpha = 1.0
+fx_dust_count = 50
+fx_dust_min_v = 25.0
+fx_dust_max_v = 25.0

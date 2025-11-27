@@ -26,13 +26,14 @@ signal drag_ended(pile: PileManager)
 
 # ========= 运行时状态 =========
 var _grid: Node = null
-var _cards: Array[Card] = []            # 顺序：底 -> 顶
+var _cards: Array[Node2D] = []           # 顺序：底 -> 顶；仅保存有效 Node2D（Card）
 var _dragging: bool = false
-var _drag_mode: StringName = &"pile"    # "pile"|"substack"
+var _drag_mode: StringName = &"pile"     # "pile"|"substack"
 var _drag_offset: Vector2 = Vector2.ZERO
 var _orig_scale: Vector2 = Vector2.ONE
 var _orig_z: int = 0
 var _suspend_anim: bool = false
+var _current_pile_hover_start_idx: int = -1
 
 # 为回弹加动画：记录拖拽前位置
 var _pre_drag_global: Vector2 = Vector2.ZERO
@@ -60,68 +61,118 @@ func _ready() -> void:
 	set_process(true)
 	set_process_unhandled_input(true)
 
-# ---------- 基础接口 ----------
-func add_card(card: Card) -> void:
+# ================= 工具：安全判断与清理 =================
+func _is_valid_obj(o: Variant) -> bool:
+	return o != null and typeof(o) == TYPE_OBJECT and is_instance_valid(o)
+
+func _cards_clean() -> void:
+	var cleaned: Array[Node2D] = []
+	for v in _cards:
+		if _is_valid_obj(v):
+			cleaned.append(v as Node2D)
+	_cards = cleaned
+
+func _dup_cards_clean() -> Array:
+	_cards_clean()
+	return _cards.duplicate()
+
+# ================= 基础接口 =================
+# —— 安全 add：过滤非法对象、保持全局位置、统一入栈与重排 —— 
+func add_card(card: Node2D) -> void:
+	if not _is_valid_obj(card):
+		return
+
 	var gp: Vector2 = card.global_position
-	if card.get_parent() != null:
-		card.get_parent().remove_child(card)
+	var parent := card.get_parent()
+	if parent != null:
+		parent.remove_child(card)
 	add_child(card)
 	card.global_position = gp
-	card.set_pile(self)
-	_cards.append(card)
+
+	if card.has_method("set_pile"):
+		card.call("set_pile", self)
+
+	if _cards.find(card) == -1:
+		_cards.append(card)
+
 	_reflow_after_change()
 
-func add_cards(cards: Array[Card]) -> void:
-	for c: Card in cards:
-		var gp: Vector2 = c.global_position
-		if c.get_parent() != null:
-			c.get_parent().remove_child(c)
-		add_child(c)
-		c.global_position = gp
-		c.set_pile(self)
-		_cards.append(c)
+func add_cards(cards: Array) -> void:
+	if cards == null or cards.is_empty():
+		return
+	for c in cards:
+		if not _is_valid_obj(c):
+			continue
+		var n2d: Node2D = c as Node2D
+		if n2d == null:
+			continue
+		var gp: Vector2 = n2d.global_position
+		var p := n2d.get_parent()
+		if p != null:
+			p.remove_child(n2d)
+		add_child(n2d)
+		n2d.global_position = gp
+		if n2d.has_method("set_pile"):
+			n2d.call("set_pile", self)
+		if _cards.find(n2d) == -1:
+			_cards.append(n2d)
 	_reflow_after_change()
 
-func remove_card(card: Card) -> void:
+func remove_card(card: Node2D) -> void:
+	if not _is_valid_obj(card):
+		# 已释放/无效：从数组剔除影子引用
+		_cards = _dup_cards_clean()
+		return
 	var i: int = _cards.find(card)
 	if i >= 0:
 		_cards.remove_at(i)
-	card.set_pile(null)
+	if card.has_method("set_pile"):
+		card.call("set_pile", null)
 	reflow_visuals()
 
-func get_cards() -> Array[Card]:
-	return _cards.duplicate()
+func get_cards() -> Array:
+	return _dup_cards_clean()
 
-func index_of_card(card: Card) -> int:
+func index_of_card(card: Node2D) -> int:
+	_cards_clean()
 	return _cards.find(card)
 
-func extract_from(index: int) -> Array[Card]:
+func extract_from(index: int) -> Array:
+	_cards_clean()
 	if index < 0 or index >= _cards.size():
 		return []
-	var extracted: Array[Card] = []
+	var extracted: Array = []
 	while _cards.size() > index:
 		extracted.append(_cards.pop_back())
 	extracted.reverse()
 	_reflow_after_change()
 	return extracted
 
-# ---------- 视觉重排 ----------
+# ================= 视觉重排 =================
 func reflow_visuals() -> void:
+	_cards_clean()
 	var step: float = card_pixel_size.y * visible_ratio
 	for i in range(_cards.size()):
-		var card: Card = _cards[i]
+		var card_n: Node2D = _cards[i]
+		if not _is_valid_obj(card_n):
+			continue
 		var target_local: Vector2 = Vector2(0.0, float(i) * step)
-		_set_card_layer(card, z_base + i * per_layer_z)
-		_move_card(card, target_local)
+		_set_card_layer(card_n, z_base + i * per_layer_z)
+		_move_card(card_n, target_local)
 
-		var full_enabled: bool = (i == _cards.size() - 1)
-		var header_enabled: bool = not full_enabled
-		card.set_hit_areas(full_enabled, header_enabled)
+		# 命中区 & 头/全身切换（若有这些方法）
+		var header_enabled: bool = false
+		if card_n.has_method("set_hit_areas"):
+			var full_enabled: bool = (i == _cards.size() - 1)
+			header_enabled = not full_enabled
+			card_n.call("set_hit_areas", full_enabled, header_enabled)
+			if auto_fit_header and header_enabled:
+				_fit_header_hit_area(card_n, step)
 
-		if auto_fit_header and header_enabled:
-			_fit_header_hit_area(card, step)
+		_ensure_card_shapes_enabled(card_n)
 
-		_ensure_card_shapes_enabled(card)
+		# —— 根据 header 是否启用，挂/卸载牌眉 hover 信号 —— 
+		_update_header_hover_signals(card_n, header_enabled)
 
 	emit_signal("pile_changed", self)
 	_update_blocked_cells()
@@ -129,10 +180,14 @@ func reflow_visuals() -> void:
 func _reflow_after_change() -> void:
 	reflow_visuals()
 
-func _set_card_layer(card: Card, z: int) -> void:
+func _set_card_layer(card: Node2D, z: int) -> void:
+	if not _is_valid_obj(card):
+		return
 	card.z_index = z
 
-func _move_card(card: Card, local_pos: Vector2) -> void:
+func _move_card(card: Node2D, local_pos: Vector2) -> void:
+	if not _is_valid_obj(card):
+		return
 	var target_global: Vector2 = to_global(local_pos)
 	if _suspend_anim or _dragging:
 		card.global_position = target_global
@@ -148,10 +203,14 @@ func _move_card(card: Card, local_pos: Vector2) -> void:
 		pile_defs["ease"]
 	)
 
-# ---------- 拖拽逻辑 ----------
-func request_drag(from_card: Card, mode: String, start_index: int = -1) -> void:
+# ================= 拖拽逻辑 =================
+func request_drag(from_card: Node2D, mode: String, start_index: int = -1) -> void:
 	if _dragging:
 		return
+
+	# 拖拽前清空所有堆叠 hover
+	_clear_all_pile_hover()
+
 	match mode:
 		"pile":
 			_begin_drag_pile()
@@ -162,29 +221,37 @@ func request_drag(from_card: Card, mode: String, start_index: int = -1) -> void:
 
 func _begin_drag_pile() -> void:
 	_kill_rebound()
+	_cards_clean()
 	_dragging = true
 	_suspend_anim = true
 	_drag_mode = &"pile"
 	_pre_drag_global = global_position
 	_release_all_blocked_cells()
+
 	if pickup_scale > 0.0 and absf(pickup_scale - 1.0) > 0.0001:
 		scale = _orig_scale * Vector2(pickup_scale, pickup_scale)
+
 	z_as_relative = false
 	if drag_z >= 0:
 		var z_cap := RenderingServer.CANVAS_ITEM_Z_MAX - 1
 		z_index = min(drag_z, z_cap)
+
 	_drag_offset = get_global_mouse_position() - global_position
-	_set_all_cards_interaction(false)
+	_set_all_cards_interaction(true, false)  # 先确保卡都可交互（有些卡在别处被禁用了）
+	_set_all_cards_interaction(false, true)  # 拖拽中禁用交互
 	emit_signal("drag_started", self)
 
-func _begin_drag_substack(from_card: Card, start_index: int) -> void:
+func _begin_drag_substack(from_card: Node2D, start_index: int) -> void:
+	if not _is_valid_obj(from_card):
+		return
 	var idx: int = start_index
 	if idx < 0:
 		idx = index_of_card(from_card)
 	if idx < 0:
 		return
-	var subset: Array[Card] = extract_from(idx)
+	var subset: Array = extract_from(idx)
 	var origin: Vector2 = from_card.global_position
+
 	var new_pile: PileManager = _spawn_new_pile_for_drag(subset, origin)
 	if new_pile == null:
 		add_cards(subset)
@@ -194,7 +261,7 @@ func _begin_drag_substack(from_card: Card, start_index: int) -> void:
 	new_pile._begin_drag_pile()
 	_reflow_after_change()
 
-func _spawn_new_pile_for_drag(cards_to_attach: Array[Card], origin_global: Vector2) -> PileManager:
+func _spawn_new_pile_for_drag(cards_to_attach: Array, origin_global: Vector2) -> PileManager:
 	var parent_node: Node = get_parent()
 	if parent_node == null:
 		parent_node = get_tree().get_current_scene()
@@ -222,7 +289,7 @@ func _spawn_new_pile_for_drag(cards_to_attach: Array[Card], origin_global: Vecto
 	new_mgr.add_cards(cards_to_attach)
 	return new_mgr
 
-# ---------- 拖拽更新与结束 ----------
+# ================= 拖拽更新与结束 =================
 func _process(_delta: float) -> void:
 	if _dragging:
 		var mouse_g: Vector2 = get_global_mouse_position()
@@ -233,7 +300,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _dragging and event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_end_drag_and_drop()
 
-# ========== 新版拖拽结束函数 ==========
 func _end_drag_and_drop() -> void:
 	if not _dragging:
 		return
@@ -243,8 +309,8 @@ func _end_drag_and_drop() -> void:
 	_suspend_anim = false
 	scale = _orig_scale
 
-	var restored := false
-	var need_rebound := true
+	var restored: bool = false
+	var need_rebound: bool = true
 
 	if _grid != null and is_instance_valid(_grid) and _grid.has_method("drop_pile"):
 		var ok := bool(_grid.call("drop_pile", self, global_position))
@@ -255,24 +321,18 @@ func _end_drag_and_drop() -> void:
 		if _source_pile_ref != null:
 			var src := _source_pile_ref.get_ref() as PileManager
 			if src != null and is_instance_valid(src):
-				var cards_back: Array[Card] = get_cards()
+				var cards_back: Array = get_cards()
 				_detach_all_cards_without_reflow()
-
 				var insert_idx: int = _source_insert_index
 				if insert_idx < 0:
 					insert_idx = src._guess_insert_index_by_position(
 						cards_back[0].global_position if cards_back.size() > 0 else global_position
 					)
-
 				src._insert_cards_at(cards_back, insert_idx)
-
-				# ① 重排（刷新 full/header 判定与 z）
 				src.reflow_visuals()
-				
 
-				# ③ 动效 + 刷新禁用格
-				if src._cards.size() > 0:
-					var top: Card = src._cards[src._cards.size() - 1]
+				if src._cards.size() > 0 and _is_valid_obj(src._cards[src._cards.size() - 1]):
+					var top := src._cards[src._cards.size() - 1]
 					var top_anim := _ensure_anim_on(top)
 					top_anim.bump()
 				if src.has_method("_update_blocked_cells"):
@@ -289,40 +349,38 @@ func _end_drag_and_drop() -> void:
 			restored = true
 	else:
 		# 成功落位：恢复交互、清理“回家”信息
-		_set_all_cards_interaction(true)
+		_set_all_cards_interaction(true, true)
 		_pre_drag_parent = null
 		_pre_drag_sibling_idx = -1
 		_source_pile_ref = null
 		_source_insert_index = -1
 
-	if not restored:
-		if has_method("_update_blocked_cells"):
-			_update_blocked_cells()
-			
+	if not restored and has_method("_update_blocked_cells"):
+		_update_blocked_cells()
 
-# ---------- 回弹动画 ----------
+# ================= 回弹动画 =================
 func _rebound_to_pre_drag() -> void:
 	_kill_rebound()
-	_set_all_cards_interaction(true)
+	_set_all_cards_interaction(true, true)
 	z_index = _orig_z
 
-	# ✅ 关键修复：确保 transform 是最新的
 	force_update_transform()
 
-	# ✅ 同步所有卡的 global_position（避免卡片漂移）
-	for c in _cards:
-		c.global_position = to_global(Vector2(0, card_pixel_size.y * visible_ratio * _cards.find(c)))
+	# 同步所有卡的位置到各自层目标（避免漂移）
+	var step: float = card_pixel_size.y * visible_ratio
+	for i in range(_cards.size()):
+		var c := _cards[i]
+		if _is_valid_obj(c):
+			c.global_position = to_global(Vector2(0.0, float(i) * step))
 
-	# ✅ 开始回弹前，先手动 reflow 一次确保堆叠顺序
 	_suspend_anim = true
 	reflow_visuals()
 	_suspend_anim = false
 
 	var anim := _ensure_anim_on(self)
-	anim.on_finished.connect(func ():
-		# 回弹结束后再次 reflow，确保视觉最终一致
+	anim.on_finished.connect(func () -> void:
 		reflow_visuals()
-		if _cards.size() > 0:
+		if _cards.size() > 0 and _is_valid_obj(_cards[_cards.size() - 1]):
 			var top := _cards[_cards.size() - 1]
 			var top_anim := _ensure_anim_on(top)
 			top_anim.bump()
@@ -330,23 +388,26 @@ func _rebound_to_pre_drag() -> void:
 			_update_blocked_cells()
 	, CONNECT_ONE_SHOT)
 
+	# 轻微回弹
 	anim.rebound_to(_pre_drag_global, 0.16)
 
-
-
-# ---------- 工具与动画 ----------
+# ================= 工具与动画 =================
 func _kill_rebound() -> void:
 	if _rebound_tween != null and is_instance_valid(_rebound_tween):
 		_rebound_tween.kill()
 	_rebound_tween = null
 
-func _set_all_cards_interaction(enabled: bool) -> void:
-	for c: Card in _cards:
-		c.set_interaction_enabled(enabled)
+func _set_all_cards_interaction(enable_before: bool, enable_now: bool) -> void:
+	# 为了避免“在禁用时正好对象被销毁”，这里每次都清理再设置
+	_cards_clean()
+	for c in _cards:
+		if _is_valid_obj(c) and c.has_method("set_interaction_enabled"):
+			# 如果需要，先开一次再关（或反之）来重置外部状态机
+			if enable_before != enable_now:
+				c.call("set_interaction_enabled", enable_before)
+			c.call("set_interaction_enabled", enable_now)
 
-# ==========================
-# —— 自动禁用覆盖格 —— 
-# ==========================
+# ================= 自动禁用覆盖格 =================
 var _blocked_cells: Array[int] = []
 
 func _update_blocked_cells() -> void:
@@ -388,6 +449,7 @@ func _unblock_previous_cells() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_unblock_previous_cells()
+		_clear_all_pile_hover()
 
 func owns_blocked_cell(cell: int) -> bool:
 	return _blocked_cells.has(cell)
@@ -400,7 +462,7 @@ func _release_all_blocked_cells() -> void:
 			_grid.unblock_cell(c)
 	_blocked_cells.clear()
 
-# ====== 动画与模板工具 ======
+# ================= 动画与模板工具 =================
 func _ensure_anim_on(node: Node2D) -> CardAnimation:
 	var anim := _find_card_anim(node)
 	if anim != null:
@@ -451,37 +513,45 @@ func _find_card_anim(node: Node) -> CardAnimation:
 			return child
 	return null
 
-# ====== 插回/回家工具 ======
+# ================= 插回/回家工具 =================
 func _detach_all_cards_without_reflow() -> void:
-	for c: Card in _cards:
-		c.set_pile(null)
+	_cards_clean()
+	for c in _cards:
+		if _is_valid_obj(c) and c.has_method("set_pile"):
+			c.call("set_pile", null)
 	_cards.clear()
 
-func _insert_cards_at(cards: Array[Card], at_index: int) -> void:
-	if cards.is_empty():
+func _insert_cards_at(cards: Array, at_index: int) -> void:
+	if cards == null or cards.is_empty():
 		return
 	var idx: int = clampi(at_index, 0, _cards.size())
-	for c: Card in cards:
+	for v in cards:
+		if not _is_valid_obj(v):
+			continue
+		var c: Node2D = v as Node2D
 		var gp: Vector2 = c.global_position
-		if c.get_parent() != null:
-			c.get_parent().remove_child(c)
+		var par := c.get_parent()
+		if par != null:
+			par.remove_child(c)
 		add_child(c)
 		c.global_position = gp
-		c.set_pile(self)
+		if c.has_method("set_pile"):
+			c.call("set_pile", self)
 		_cards.insert(idx, c)
 		idx += 1
 
 func _guess_insert_index_by_position(pos_g: Vector2) -> int:
+	_cards_clean()
 	if _cards.is_empty():
 		return 0
 	for i in range(_cards.size()):
-		var ci: Card = _cards[i]
-		if pos_g.y <= ci.global_position.y:
+		var ci := _cards[i]
+		if _is_valid_obj(ci) and pos_g.y <= ci.global_position.y:
 			return i
 	return _cards.size()
 
-func _ensure_card_shapes_enabled(card: Card) -> void:
-	if card == null:
+func _ensure_card_shapes_enabled(card: Node2D) -> void:
+	if not _is_valid_obj(card):
 		return
 	var full := card.get_node_or_null(^"hit_full") as Area2D
 	if full != null:
@@ -493,20 +563,18 @@ func _ensure_card_shapes_enabled(card: Card) -> void:
 		var csh := header.get_node_or_null(^"CollisionShape2D") as CollisionShape2D
 		if csh != null:
 			csh.set_deferred("disabled", false)
-	if "set_interaction_enabled" in card:
-		card.set_interaction_enabled(true)
-	if "get_pile" in card:
-		if card.get_pile() != self:
-			card.set_pile(self)
-	else:
-		card.set_pile(self)
-
-func _ensure_whole_pile_shapes_enabled() -> void:
-	for c: Card in _cards:
-		_ensure_card_shapes_enabled(c)
+	if card.has_method("set_interaction_enabled"):
+		card.call("set_interaction_enabled", true)
+	if card.has_method("get_pile") and card.has_method("set_pile"):
+		if card.call("get_pile") != self:
+			card.call("set_pile", self)
+	elif card.has_method("set_pile"):
+		card.call("set_pile", self)
 
 # ---------- 牌眉命中区尺寸/位置调整 ----------
-func _fit_header_hit_area(card: Card, strip_h: float) -> void:
+func _fit_header_hit_area(card: Node2D, strip_h: float) -> void:
+	if not _is_valid_obj(card):
+		return
 	var area: Area2D = card.get_node_or_null(^"hit_header") as Area2D
 	if area == null:
 		return
@@ -518,3 +586,122 @@ func _fit_header_hit_area(card: Card, strip_h: float) -> void:
 		return
 	rect.extents = Vector2(card_pixel_size.x * 0.5, maxf(strip_h, 1.0) * 0.5)
 	cs.position = Vector2(0.0, -card_pixel_size.y * 0.5 + strip_h * 0.5)
+
+# ================== SellingArea 钩子 ==================
+func on_node_will_be_sold(n: Node2D) -> void:
+	if n == null:
+		return
+	# 单个节点将被卖出：如果在本堆中，先移除它，避免后续继续引用
+	remove_card(n)
+
+func on_pile_will_be_sold(n: Node2D) -> void:
+	if n == self:
+		_cards.clear() # 动画/释放由 SellingArea 完成
+
+func on_cards_sold(nodes: Array) -> void:
+	if nodes == null:
+		return
+	var to_remove: Array = []
+	for c in _cards:
+		if nodes.find(c) != -1:
+			to_remove.append(c)
+	for r in to_remove:
+		remove_card(r)
+
+# =====================================================
+#          牌眉 Hover 联动 CardController 放大
+# =====================================================
+
+func _update_header_hover_signals(card: Node2D, header_enabled: bool) -> void:
+	if not _is_valid_obj(card):
+		return
+	var area: Area2D = card.get_node_or_null(^"hit_header") as Area2D
+	if area == null:
+		return
+
+	var enter_call := Callable(self, "_on_header_mouse_entered").bind(card)
+	var exit_call := Callable(self, "_on_header_mouse_exited").bind(card)
+
+	if header_enabled:
+		if not area.is_connected("mouse_entered", enter_call):
+			area.connect("mouse_entered", enter_call)
+		if not area.is_connected("mouse_exited", exit_call):
+			area.connect("mouse_exited", exit_call)
+	else:
+		if area.is_connected("mouse_entered", enter_call):
+			area.disconnect("mouse_entered", enter_call)
+		if area.is_connected("mouse_exited", exit_call):
+			area.disconnect("mouse_exited", exit_call)
+
+func _on_header_mouse_entered(card: Node2D) -> void:
+	if not _is_valid_obj(card):
+		return
+	var idx: int = index_of_card(card)
+	if idx < 0:
+		return
+
+	# 如果还是同一张牌的牌眉，别重复改，避免抖
+	if idx == _current_pile_hover_start_idx:
+		return
+
+	# 先把之前那段 pile hover 清掉
+	if _current_pile_hover_start_idx >= 0:
+		_clear_pile_hover_from(_current_pile_hover_start_idx)
+
+	# 从这张牌开始，往上的所有牌都触发 hover
+	_apply_pile_hover_from(idx)
+	_current_pile_hover_start_idx = idx
+
+
+func _on_header_mouse_exited(card: Node2D) -> void:
+	if not _is_valid_obj(card):
+		return
+	var idx: int = index_of_card(card)
+	if idx < 0:
+		return
+
+	# 只有正在生效的那一段需要清
+	if idx != _current_pile_hover_start_idx:
+		return
+
+	_clear_pile_hover_from(idx)
+	_current_pile_hover_start_idx = -1
+
+
+func _apply_pile_hover_from(start_idx: int) -> void:
+	_cards_clean()
+	if start_idx < 0:
+		start_idx = 0
+	for i in range(start_idx, _cards.size()):
+		_set_card_pile_hover(_cards[i], true)
+
+
+func _clear_pile_hover_from(start_idx: int) -> void:
+	_cards_clean()
+	if start_idx < 0:
+		start_idx = 0
+	for i in range(start_idx, _cards.size()):
+		_set_card_pile_hover(_cards[i], false)
+
+func _clear_all_pile_hover() -> void:
+	_cards_clean()
+	for c in _cards:
+		_set_card_pile_hover(c, false)
+	_current_pile_hover_start_idx = -1
+
+
+func _set_card_pile_hover(card: Node2D, active: bool) -> void:
+	if not _is_valid_obj(card):
+		return
+	# 假设 CardController 挂在 Card 根下面某个子节点
+	# 优先按名字找，其次按类型找
+	var ctrl_node: Node = card.get_node_or_null(^"CardController")
+	if ctrl_node == null:
+		for child in card.get_children():
+			if child is CardController:
+				ctrl_node = child
+				break
+	if ctrl_node == null:
+		return
+	if ctrl_node.has_method("set_pile_hover"):
+		ctrl_node.call("set_pile_hover", active)

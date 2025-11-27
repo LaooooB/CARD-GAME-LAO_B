@@ -1,0 +1,48 @@
+[gd_scene load_steps=5 format=3 uid="uid://utdjd6rbipxo"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Working_Unit/work_unit_base.gd" id="1_jpqrt"]
+[ext_resource type="PackedScene" uid="uid://clx6jar13lxij" path="res://GAME/scenes/2D/Working_Unit/work_unit_job.tscn" id="2_jjhn3"]
+[ext_resource type="Texture2D" uid="uid://d3bcmsbpe3qhi" path="res://GAME/assets/sprites/cards/1.2 Poker cards/80_1.2 Poker cards.png" id="2_ynqg3"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1hf2g"]
+size = Vector2(103, 128)
+
+[node name="Work Unit Base" type="Node2D"]
+script = ExtResource("1_jpqrt")
+pickup_scale = 2.0
+job_open_trans = 9
+job_open_ease = 2
+job_close_trans = 10
+job_close_ease = 1
+work_unit_job_scene = ExtResource("2_jjhn3")
+job_offset_right = Vector2(40, -25)
+job_open_duration = 0.35
+job_close_duration = 0.35
+job_open_scale = Vector2(0.01, 1)
+job_close_scale = Vector2(0.01, 1)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(28.5, 34)
+scale = Vector2(2.2766, 2.09375)
+texture = ExtResource("2_ynqg3")
+
+[node name="hit_full" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="hit_full"]
+position = Vector2(28.5, 33)
+shape = SubResource("RectangleShape2D_1hf2g")
+
+[node name="NameLabel" type="Label" parent="."]
+z_index = 4096
+anchors_preset = -1
+anchor_left = -0.012
+anchor_top = -0.029
+anchor_right = 0.013
+offset_left = -23.0
+offset_top = -31.0
+offset_right = -22.0
+offset_bottom = -8.66667
+size_flags_horizontal = 0
+size_flags_vertical = 0
+horizontal_alignment = 1
+vertical_alignment = 1

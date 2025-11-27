@@ -1,7 +1,7 @@
 [
   {
 	"ID": 0,
-	"CARD_NAME": "wood",
+	"CARD_NAME": "Wood",
 	"CARD_TYPE": "Crafting Material",
 	"ELEMENT": "earth",
 	"RARITY": "nigredo",
@@ -10,16 +10,42 @@
 	"WATER": 0,
 	"FIRE": 0,
 	"AIR": 0,
-	"SCENE_PATH": "res://GAME/scenes/2D/cards/Crafting material/common/card.tscn"
+	"SCENE_PATH": "res://GAME/scenes/2D/cards/Crafting material/common/card_base_ai.tscn"
   },
   {
 	"ID": 1,
-	"CARD_NAME": "stone",
+	"CARD_NAME": "Stone",
 	"CARD_TYPE": "Crafting Material",
 	"ELEMENT": "earth",
 	"RARITY": "nigredo",
 	"VALUE": 1,
 	"EARTH": 1,
+	"WATER": 0,
+	"FIRE": 0,
+	"AIR": 0,
+	"SCENE_PATH": "res://GAME/scenes/2D/cards/Crafting material/common/card_base_ai.tscn"
+  },
+  {
+	"ID": 2,
+	"CARD_NAME": "Woodstone",
+	"CARD_TYPE": "Crafting Material",
+	"ELEMENT": "earth",
+	"RARITY": "nigredo",
+	"VALUE": 3,
+	"EARTH": 3,
+	"WATER": 0,
+	"FIRE": 0,
+	"AIR": 0,
+	"SCENE_PATH": "res://GAME/scenes/2D/cards/Crafting material/common/card_base_ai.tscn"
+  },
+  {
+	"ID": 3,
+	"CARD_NAME": "Stonewood",
+	"CARD_TYPE": "Crafting Material",
+	"ELEMENT": "earth",
+	"RARITY": "nigredo",
+	"VALUE": 3,
+	"EARTH": 3,
 	"WATER": 0,
 	"FIRE": 0,
 	"AIR": 0,

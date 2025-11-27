@@ -211,10 +211,40 @@ func get_cell_pos(cell: int) -> Vector2:
 func is_cell_free(cell: int) -> bool:
 	return _valid_cell(cell) and _occupancy.get(cell, null) == null
 
-## 获取单元格上的堆
-func get_pile(cell: int) -> PileManager:
-	return _occupancy.get(cell, null)
 
+
+# ====== 安全解引用：把 WeakRef / 对象 / null 统一转成 PileManager ======
+func _to_valid_pile(v: Variant) -> PileManager:
+	if v == null:
+		return null
+	if v is WeakRef:
+		var w: WeakRef = v as WeakRef
+		var o: Object = w.get_ref()
+		if o != null and is_instance_valid(o):
+			return o as PileManager
+		return null
+	# 直接对象（向后兼容：以前可能直接塞了对象进 _occupancy）
+	if v is PileManager and is_instance_valid(v):
+		return v as PileManager
+	if typeof(v) == TYPE_OBJECT and is_instance_valid(v):
+		return v as PileManager
+	return null
+	
+# ====== 读取占用并顺带清理无效引用 ======
+func get_pile(cell: int) -> PileManager:
+	if not _occupancy.has(cell):
+		return null
+	var p: PileManager = _to_valid_pile(_occupancy[cell])
+	if p == null:
+		_occupancy.erase(cell)
+	return p
+
+func _set_pile(cell: int, pile: PileManager) -> void:
+	if pile == null:
+		_occupancy.erase(cell)
+	else:
+		_occupancy[cell] = weakref(pile)
+		
 ## 检查单元格是否被禁用
 func is_cell_forbidden(cell: int) -> bool:
 	return forbidden_cells.has(cell)
@@ -256,7 +286,7 @@ func unblock_all() -> void:
 # —— 输入：投放（吸附） —— 
 # =========================
 ## 投放卡片到指定位置
-func drop_card(card: Card, drop_global: Vector2, source_grid: GridManager = null) -> bool:
+func drop_card(card: Node2D, drop_global: Vector2, source_grid: GridManager = null) -> bool:
 	var pile_hit: PileManager = _pick_pile_at_point(drop_global)
 	if pile_hit != null:
 		pile_hit.add_card(card)
@@ -302,26 +332,46 @@ func drop_card(card: Card, drop_global: Vector2, source_grid: GridManager = null
 
 ## 投放堆到指定位置
 func drop_pile(pile: PileManager, drop_global: Vector2, source_grid: GridManager = null) -> bool:
+	if pile == null or not is_instance_valid(pile):
+		return false
+
+	# —— ① 优先找落点上的其他堆合并（跳过 grid）——
 	var target_pile: PileManager = _pick_pile_at_point(drop_global)
-	if target_pile != null and target_pile != pile:
+	if target_pile != null and target_pile != pile and is_instance_valid(target_pile):
 		var src_cell: int = _find_cell_by_pile(pile)
-		var cards_to_merge: Array = pile.get_cards()
+
+		# —— 安全收集可合并的卡 —— 
+		var cards_to_merge: Array[Node2D] = _safe_filter_node2d(pile.get_cards())
+
+		# 先处理来源格子的释放（不再传 freed 节点）
+		if src_cell >= 0:
+			if source_grid != null and source_grid != self:
+				source_grid.vacate_cell(src_cell, null)
+			else:
+				_vacate_if(src_cell, null)
+
+		# 逐个加入目标堆（再次校验）
 		for c in cards_to_merge:
-			target_pile.add_card(c)
+			if is_instance_valid(c):
+				target_pile.add_card(c)
+
+		# 销毁原堆并停止使用其引用
 		pile.queue_free()
+		pile = null
+
+		# 更新动画与事件
+		var tgt_cell := _find_cell_by_pile(target_pile)
+		_animate_pile_to_position(target_pile, tgt_cell)
 		if source_grid != null and source_grid != self:
-			if src_cell >= 0:
-				source_grid.vacate_cell(src_cell, pile)
-			emit_signal("dropped_from_other_grid", source_grid.grid_id, _find_cell_by_pile(target_pile), pile)
-		else:
-			_vacate_if(src_cell, pile)
-		_animate_pile_to_position(target_pile, _find_cell_by_pile(target_pile))
-		emit_signal("pile_dropped_to_cell", target_pile, _find_cell_by_pile(target_pile))
+			emit_signal("dropped_from_other_grid", source_grid.grid_id, tgt_cell, target_pile)
+		emit_signal("pile_dropped_to_cell", target_pile, tgt_cell)
 		return true
 
+	# —— ② 走格子吸附逻辑 —— 
 	var cell: int = _world_to_cell_idx(drop_global)
 	if cell == -1:
 		cell = _world_to_cell_idx(pile.global_position)
+
 	if cell == -1 and not allow_out_of_bounds:
 		emit_signal("drop_rejected", pile, "out_of_bounds")
 		return false
@@ -329,6 +379,7 @@ func drop_pile(pile: PileManager, drop_global: Vector2, source_grid: GridManager
 		emit_signal("drop_rejected", pile, "no_snap_region")
 		return false
 
+	# 禁用格子判定
 	var moving_into_own_blocked := false
 	if cell != -1 and is_cell_forbidden(cell):
 		var owner: PileManager = _owner_of_forbidden_cell(cell)
@@ -338,13 +389,14 @@ func drop_pile(pile: PileManager, drop_global: Vector2, source_grid: GridManager
 			emit_signal("drop_rejected", pile, "forbidden_cell")
 			return false
 
+	# 同堆内移动：直接改占用
 	if moving_into_own_blocked:
 		var src_cell_direct: int = _find_cell_by_pile(pile)
 		if src_cell_direct >= 0:
 			if source_grid != null and source_grid != self:
-				source_grid.vacate_cell(src_cell_direct, pile)
+				source_grid.vacate_cell(src_cell_direct, null)
 			else:
-				_vacate_if(src_cell_direct, pile)
+				_vacate_if(src_cell_direct, null)
 		_occupancy[cell] = pile
 		_animate_pile_to_position(pile, cell)
 		if source_grid != null and source_grid != self:
@@ -352,6 +404,7 @@ func drop_pile(pile: PileManager, drop_global: Vector2, source_grid: GridManager
 		emit_signal("pile_dropped_to_cell", pile, cell)
 		return true
 
+	# 普通落格：若目标格已有堆，则合并；否则放置
 	var src_cell2: int = _find_cell_by_pile(pile)
 	var dst_pile2: PileManager = _ensure_pile(cell)
 	if dst_pile2 == null:
@@ -359,21 +412,44 @@ func drop_pile(pile: PileManager, drop_global: Vector2, source_grid: GridManager
 		return false
 
 	if dst_pile2 != pile:
-		var cards2: Array = pile.get_cards()
-		for c2 in cards2:
-			dst_pile2.add_card(c2)
-		pile.queue_free()
-
-	_animate_pile_to_position(dst_pile2, cell)
-	_occupancy[cell] = dst_pile2
-	if source_grid != null and source_grid != self:
+		# 先释放来源格占用
 		if src_cell2 >= 0:
-			source_grid.vacate_cell(src_cell2, pile)
-		emit_signal("dropped_from_other_grid", source_grid.grid_id, cell, dst_pile2)
-	else:
-		_vacate_if(src_cell2, pile)
-	emit_signal("pile_dropped_to_cell", dst_pile2, cell)
+			if source_grid != null and source_grid != self:
+				source_grid.vacate_cell(src_cell2, null)
+			else:
+				_vacate_if(src_cell2, null)
+
+		# —— 安全合并 —— 
+		var cards2: Array[Node2D] = _safe_filter_node2d(pile.get_cards())
+		for c2 in cards2:
+			if is_instance_valid(c2):
+				dst_pile2.add_card(c2)
+
+		# 销毁原堆，并不要再使用 pile
+		pile.queue_free()
+		pile = null
+
+		# 目标堆定位与事件
+		_occupancy[cell] = dst_pile2
+		_animate_pile_to_position(dst_pile2, cell)
+		if source_grid != null and source_grid != self:
+			emit_signal("dropped_from_other_grid", source_grid.grid_id, cell, dst_pile2)
+		emit_signal("pile_dropped_to_cell", dst_pile2, cell)
+		return true
+
+	# 落在自己的空格（或同堆移动）：
+	if src_cell2 >= 0 and src_cell2 != cell:
+		if source_grid != null and source_grid != self:
+			source_grid.vacate_cell(src_cell2, null)
+		else:
+			_vacate_if(src_cell2, null)
+	_occupancy[cell] = pile
+	_animate_pile_to_position(pile, cell)
+	if source_grid != null and source_grid != self:
+		emit_signal("dropped_from_other_grid", source_grid.grid_id, cell, pile)
+	emit_signal("pile_dropped_to_cell", pile, cell)
 	return true
+
 
 # =========================
 # —— 私有：堆管理 —— 
@@ -396,13 +472,13 @@ func _ensure_pile(cell: int) -> PileManager:
 	add_child(pile_node)
 	pile_node.global_position = get_cell_pos(cell)
 	var mgr: PileManager = pile_node as PileManager
-	if mgr != null:
+	if mgr != null and ("card_pixel_size" in mgr):
 		mgr.card_pixel_size = card_pixel_size
 	_occupancy[cell] = mgr
 	return mgr
 
 ## 查找卡片所在的单元格
-func _find_cell_by_card(card: Card) -> int:
+func _find_cell_by_card(card: Node2D) -> int:
 	for i in range(cols * rows):
 		var pile: PileManager = _occupancy.get(i, null)
 		if pile != null and is_instance_valid(pile):
@@ -430,10 +506,10 @@ func vacate_cell(cell: int, target: Node) -> void:
 	var pile: PileManager = _occupancy.get(cell, null)
 	if pile == null or not is_instance_valid(pile):
 		return
-	if target is Card:
+	if target is Node2D:
 		var cards: Array = pile.get_cards()
 		if target in cards:
-			pile.remove_card(target)  # Assumes PileManager has a remove_card method
+			pile.remove_card(target)  # 假定 PileManager 有 remove_card
 			if pile.get_cards().size() == 0:
 				pile.queue_free()
 				_occupancy[cell] = null
@@ -510,7 +586,7 @@ func _pick_pile_at_point(point: Vector2) -> PileManager:
 	for r in range(max(0, cr.y - 1), min(rows, cr.y + 2)):
 		for c in range(max(0, cr.x - 1), min(cols, cr.x + 2)):
 			var cell: int = _idx(c, r)
-			var pile := _occupancy.get(cell, null) as PileManager
+			var pile := get_pile(cell)
 			if pile != null and is_instance_valid(pile):
 				candidates.append(pile)
 
@@ -522,7 +598,7 @@ func _pick_pile_at_point(point: Vector2) -> PileManager:
 			var cards: Array = pile.get_cards()
 			if cards.size() > 0:
 				var top_card := cards[cards.size() - 1] as Node2D
-				if top_card != null:
+				if top_card != null and is_instance_valid(top_card):
 					z_top = top_card.z_index
 			if z_top >= best_z:
 				best_z = z_top
@@ -535,9 +611,9 @@ func _point_hits_pile_top_card(point: Vector2, pile: PileManager) -> bool:
 	if cards.size() == 0:
 		return false
 	var top_card := cards[cards.size() - 1] as Node2D
-	if top_card == null:
+	if top_card == null or not is_instance_valid(top_card):
 		return false
-	var size_px: Vector2 = pile.card_pixel_size * top_card.scale
+	var size_px: Vector2 = pile.card_pixel_size * top_card.scale if ("card_pixel_size" in pile) else (card_pixel_size * top_card.scale)
 	var half: Vector2 = size_px * 0.5
 	var topleft: Vector2 = top_card.global_position - half
 	var rect := Rect2(topleft, size_px)
@@ -623,7 +699,7 @@ func _animate_pile_to_position(pile: PileManager, cell: int) -> void:
 
 	var anim := _ensure_anim_on(pile)
 
-	# 一次性连接，避免重复，无需手动断开
+	# 一次性连接，避免重复
 	anim.on_finished.connect(func ():
 		if is_instance_valid(pile):
 			pile.reflow_visuals()
@@ -685,7 +761,7 @@ func _ensure_anim_on(node: Node2D) -> CardAnimation:
 
 	return anim
 
-# ===== GridManager.gd：新增：动画模板工具 =====
+# ===== 动画模板工具 =====
 func _anim_defaults() -> CardAnimation:
 	if anim_defaults_path == NodePath():
 		return null
@@ -707,7 +783,7 @@ func _find_card_anim(node: Node) -> CardAnimation:
 			return child
 	return null
 	
-	## 投放卡包到指定位置（仅做合法性判定，不占用网格）
+## 投放卡包到指定位置（仅做合法性判定，不占用网格）
 func drop_pack(pack: Node2D, drop_global: Vector2) -> bool:
 	var cell: int = _world_to_cell_idx(drop_global)
 	if cell == -1 and not allow_out_of_bounds:
@@ -730,3 +806,52 @@ func world_to_cell_idx(world: Vector2) -> int:
 func world_to_cell_center(world: Vector2) -> Vector2:
 	var cell := _world_to_cell_idx(world)
 	return get_cell_pos(cell) if cell != -1 else world
+
+# —— 在 GridManager 里 —— 
+func on_node_will_be_sold(n: Node2D) -> void:
+	_vacate_references(n)
+
+func on_pile_will_be_sold(n: Node2D) -> void:
+	_vacate_references(n)
+
+func on_cards_sold(nodes: Array) -> void:
+	for n in nodes:
+		_vacate_references(n)
+
+func _vacate_references(n: Node2D) -> void:
+	if n == null:
+		return
+	var to_clear: Array = []
+	for k in _occupancy.keys():
+		var v = _occupancy[k]
+		if v == null or not is_instance_valid(v):
+			to_clear.append(k)
+			continue
+		if v == n:
+			to_clear.append(k)
+			continue
+		if v is PileManager:
+			var pm: PileManager = v
+			for c in pm.get_cards():
+				if c == n:
+					to_clear.append(k)
+					break
+	for k in to_clear:
+		_occupancy.erase(k)
+
+# =========================
+# —— 工具：安全过滤 —— 
+# =========================
+func _safe_filter_node2d(list_in: Array) -> Array[Node2D]:
+	var out: Array[Node2D] = []
+	for v in list_in:
+		if v == null:
+			continue
+		if typeof(v) != TYPE_OBJECT:
+			continue
+		if not is_instance_valid(v):
+			continue
+		var n := v as Node2D
+		if n != null:
+			out.append(n)
+	return out

@@ -65,7 +65,7 @@ var _press_pos_screen: Vector2 = Vector2.ZERO
 var _press_time_ms: int = 0
 var _pressing: bool = false
 
-# —— 索引：CARD_NAME(lower) → row(dict，含 SCENE_PATH 等) —— 
+# —— 索引：CARD_NAME(lower) → row(dict，含 SCENE_PATH 等) ——
 var _by_card_name: Dictionary = {}   # key: String(lowercase), value: Dictionary
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -278,15 +278,49 @@ func _restore_visual_post_drop(_accepted: bool) -> void:
 func _spawn_then_vanish_if_success() -> void:
 	set_interaction_enabled(false)
 
-	var spawned: int = _spawn_cards_from_blueprints(spawn_count, spawn_card_names)
+	var requested: int = spawn_count
+	var allowed: int = requested
+
+	# —— 尝试用 CardLimitManager 限制生成数量 —— 
+	var limit_mgr: Node = _get_card_limit_manager()
+	if limit_mgr != null:
+		# 先重算一次当前场上卡牌数量（只在这里扫描，不再定时扫）
+		if limit_mgr.has_method("recalculate_from_board"):
+			limit_mgr.call("recalculate_from_board")
+
+		var cur: int = int(limit_mgr.get("current_card_count"))
+		var cap: int = int(limit_mgr.get("max_card_capacity"))
+		var free: int = cap - cur
+
+		if free <= 0:
+			allowed = 0
+		else:
+			allowed = min(requested, free)
+
+	if allowed <= 0:
+		# 容量已满：不生成，也不消失，还原交互
+		set_interaction_enabled(true)
+		if debug_log:
+			push_warning("[CardPack] capacity full, no cards spawned.")
+		return
+
+	# —— 只生成 allowed 张，其余的“被cap住” —— 
+	var spawned: int = _spawn_cards_from_blueprints(allowed, spawn_card_names)
 	if spawned <= 0:
-		# 失败：不消失，恢复交互，并打印原因
 		set_interaction_enabled(true)
 		if debug_log:
 			push_warning("[CardPack] spawn failed; check blueprints, CARD_NAME filter, or SCENE_PATH.")
 		return
 
+	if debug_log and spawned < requested:
+		print("[CardPack] spawned ", spawned, "/", requested, " due to capacity limit.")
+
+	# 生成完再重算一次，让 UI / 其它逻辑拿到最新数量
+	if limit_mgr != null and limit_mgr.has_method("recalculate_from_board"):
+		limit_mgr.call("recalculate_from_board")
+
 	await _vanish_now()
+
 
 func _vanish_now() -> void:
 	var target_scale: Vector2 = _orig_scale * Vector2(vanish_end_scale, vanish_end_scale)
@@ -305,7 +339,7 @@ func _spawn_cards_from_blueprints(count: int, allowed_names: PackedStringArray) 
 			push_warning("[CardPack] blueprint index empty; file missing/parse empty?")
 		return 0
 
-	# —— 构造候选与权重 —— 
+	# —— 构造候选与权重 ——
 	var cw: Dictionary = _build_candidates_and_weights(allowed_names)
 	var candidates: Array[String] = cw["names"]
 	var weights: Array[float] = cw["weights"]
@@ -353,14 +387,25 @@ func _spawn_one_card(scene_path: String, idx: int, total: int, row: Dictionary) 
 		var offset: Vector2 = Vector2(cos(angle), sin(angle)) * spawn_scatter
 		(inst as Node2D).global_position = global_position + offset
 
-	# ✅ 调工厂 + 日志
-	if Engine.has_singleton("CardFactory"):
+	# ✅ 只通过 /root/CardFactory 获取 AutoLoad；并且仅按名字贴数据，避免 scene 覆盖
+	var cf: Node = _get_card_factory()
+	var card_name := str(row.get("CARD_NAME", "")).strip_edges()
+	if cf != null and card_name != "":
+		# 元数据双保险（有的流程会从 meta 读取）
+		inst.set_meta("CARD_NAME", card_name)
 		if debug_log:
-			print("[Pack] apply_card -> name=", row.get("CARD_NAME", "<nil>"))
-		Engine.get_singleton("CardFactory").apply_card(inst, row)
+			print("[Pack] apply_by_name -> ", card_name)
+
+		if cf.has_method("apply_spawned"):
+			cf.call("apply_spawned", inst, card_name)
+		elif cf.has_method("apply_by_name"):
+			cf.call("apply_by_name", inst, card_name)
+		elif cf.has_method("apply_card"):
+			# 只传名字，避免其内部再用 scene_path 做匹配
+			cf.call("apply_card", inst, {"CARD_NAME": card_name})
 	else:
 		if debug_log:
-			print("[Pack] NO CardFactory singleton!")
+			print("[Pack] NO CardFactory at /root/CardFactory or empty name")
 
 	# 可选淡入（略）
 	return true
@@ -407,7 +452,7 @@ func _parse_rows_array(arr: Array, dst: Dictionary, override_existing: bool) -> 
 			_add_row(row_var as Dictionary, dst, override_existing)
 
 func _add_row(row: Dictionary, dst: Dictionary, override_existing: bool) -> void:
-	# —— 严格字段名：CARD_NAME 与 SCENE_PATH 必填；其他字段按原样保留 —— 
+	# —— 严格字段名：CARD_NAME 与 SCENE_PATH 必填；其他字段按原样保留 ——
 	var card_name_s: String = str(row.get("CARD_NAME", ""))
 	var scene_path_s: String = str(row.get("SCENE_PATH", ""))
 
@@ -580,3 +625,19 @@ func _normalize_or_warn_weights() -> void:
 		if normalize_weights_on_start:
 			for i in range(spawn_card_weights.size()):
 				spawn_card_weights[i] = float(spawn_card_weights[i]) / s
+
+# =========================
+# ===== 私有工具函数 =====
+# =========================
+func _get_card_factory() -> Node:
+	# 只通过 AutoLoad 节点名获取，不再使用 Engine.has_singleton
+	var root := get_tree().get_root()
+	if root.has_node(^"/root/CardFactory"):
+		return root.get_node(^"/root/CardFactory")
+	return null
+
+func _get_card_limit_manager() -> Node:
+	var root := get_tree().get_root()
+	if root.has_node(^"/root/CardLimitManager"):
+		return root.get_node(^"/root/CardLimitManager")
+	return null

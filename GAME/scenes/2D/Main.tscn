@@ -1,27 +1,169 @@
-[gd_scene load_steps=9 format=3 uid="uid://cc607aoh18n2o"]
+[gd_scene load_steps=19 format=3 uid="uid://cc607aoh18n2o"]
 
 [ext_resource type="Script" path="res://GAME/scripts/System/camera/camera.gd" id="1_8jnm7"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Economy/coinhud.gd" id="2_5appd"]
 [ext_resource type="Script" path="res://GAME/scripts/System/cardfactory.gd" id="2_fykw1"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Card Counter/card_limit_manager_ui.gd" id="2_judno"]
+[ext_resource type="Script" path="res://GAME/scripts/Card_Packs/cardpackspawnerbase.gd" id="2_v06y3"]
 [ext_resource type="Texture2D" uid="uid://cl6ejqqhshn1a" path="res://GAME/assets/sprites/world/cyan.png" id="5_h3kf7"]
-[ext_resource type="PackedScene" uid="uid://b18tf24s1hag4" path="res://GAME/scenes/2D/card_packs/cardpack.tscn" id="8_6pqdo"]
-[ext_resource type="PackedScene" uid="uid://b6qgliyxs8q1x" path="res://GAME/scenes/2D/Gameplay/selling_area.tscn" id="8_tti53"]
+[ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/pile_manager.gd" id="5_n84gd"]
+[ext_resource type="PackedScene" uid="uid://b671352crc2xy" path="res://GAME/scenes/2D/Gameplay/Recipe/Recipe_manager.tscn" id="7_okgc3"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Economy/coinmodel.gd" id="11_si33c"]
+[ext_resource type="Texture2D" uid="uid://dp2a6qmglld51" path="res://GAME/assets/sprites/gameplay/coine.jpg" id="12_rm3fb"]
 [ext_resource type="Texture2D" uid="uid://dfk665dtn5do3" path="res://GAME/assets/sprites/world/purple.jpg" id="12_yokv5"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Economy/sellingarea.gd" id="13_da35l"]
+[ext_resource type="PackedScene" uid="uid://utdjd6rbipxo" path="res://GAME/scenes/2D/Working_Unit/work_unit_base.tscn" id="13_mm6ls"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Card Counter/card_limit_manager.gd" id="16_fneu7"]
 [ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/grid_manager.gd" id="18_0s2mq"]
 [ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/2D/Card_Stack_Snap_Animation/pile.tscn" id="19_isrik"]
 
+[sub_resource type="LabelSettings" id="LabelSettings_rxydv"]
+font_size = 10
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ua85g"]
+size = Vector2(119, 106)
+
 [node name="Main" type="Node2D"]
 
-[node name="System" type="Node2D" parent="."]
+[node name="UI Canvas" type="CanvasLayer" parent="."]
 
-[node name="Card_Factory" type="Node2D" parent="System"]
-script = ExtResource("2_fykw1")
-blueprints_json_path = "res://GAME/data/cards/card_blueprint.json"
-name_text_uppercase = false
+[node name="UI" type="Control" parent="UI Canvas"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Resource UI" type="Control" parent="UI Canvas/UI"]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Coin UI" type="PanelContainer" parent="UI Canvas/UI/Resource UI"]
+layout_mode = 0
+offset_right = 172.0
+offset_bottom = 40.0
+
+[node name="Coin UI" type="MarginContainer" parent="UI Canvas/UI/Resource UI/Coin UI"]
+layout_mode = 2
+
+[node name="Coin UI" type="HBoxContainer" parent="UI Canvas/UI/Resource UI/Coin UI/Coin UI"]
+layout_mode = 2
+alignment = 1
+
+[node name="Coin" type="Label" parent="UI Canvas/UI/Resource UI/Coin UI/Coin UI/Coin UI"]
+layout_mode = 2
+size_flags_horizontal = 3
+label_settings = SubResource("LabelSettings_rxydv")
+horizontal_alignment = 1
+vertical_alignment = 1
+script = ExtResource("2_5appd")
+coin_model_path = NodePath("../../../../../../../System/Economy/Coin_Model")
+
+[node name="Work Unit UI" type="Control" parent="UI Canvas/UI"]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Card Counter UI" type="PanelContainer" parent="UI Canvas/UI"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_right = 172.0
+offset_bottom = 39.0
+grow_vertical = 0
+
+[node name="Card Counter UI" type="MarginContainer" parent="UI Canvas/UI/Card Counter UI"]
+layout_mode = 2
+
+[node name="Card Counter UI" type="HBoxContainer" parent="UI Canvas/UI/Card Counter UI/Card Counter UI"]
+layout_mode = 2
+alignment = 1
+
+[node name="Card Counter UI" type="Label" parent="UI Canvas/UI/Card Counter UI/Card Counter UI/Card Counter UI"]
+layout_mode = 2
+size_flags_horizontal = 3
+label_settings = SubResource("LabelSettings_rxydv")
+horizontal_alignment = 1
+vertical_alignment = 1
+script = ExtResource("2_judno")
+
+[node name="Map" type="Node2D" parent="."]
+position = Vector2(950, 540)
+
+[node name="Main" type="Node2D" parent="Map"]
+
+[node name="Main_map" type="Sprite2D" parent="Map/Main"]
+position = Vector2(12.5, 6.81877e-05)
+scale = Vector2(6.41667, 6.42857)
+texture = ExtResource("5_h3kf7")
+
+[node name="Shop" type="Node2D" parent="Map"]
+z_as_relative = false
+position = Vector2(1920, 0)
+
+[node name="Shop_map" type="Sprite2D" parent="Map/Shop"]
+position = Vector2(15.0001, 1)
+texture = ExtResource("12_yokv5")
+
+[node name="Secret" type="Node2D" parent="Map"]
+position = Vector2(1920, 1080)
+
+[node name="Main_map" type="Sprite2D" parent="Map/Secret"]
+position = Vector2(9.00001, -6.69275e-05)
+scale = Vector2(6.36, 6.42857)
+texture = ExtResource("5_h3kf7")
+
+[node name="Storage" type="Node2D" parent="Map"]
+position = Vector2(0, 1080)
+
+[node name="Storage_map2" type="Sprite2D" parent="Map/Storage"]
+position = Vector2(12.5, 0)
+scale = Vector2(1.0026, 1)
+texture = ExtResource("12_yokv5")
+
+[node name="Pack spawner" type="Control" parent="Map/Storage"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = -949.0
+offset_top = -1562.0
+offset_right = -910.0
+offset_bottom = -1530.0
+
+[node name="Summon common pack" type="Button" parent="Map/Storage/Pack spawner"]
+z_index = 5
+layout_mode = 1
+anchors_preset = -1
+anchor_left = -0.026
+anchor_top = 39.418
+anchor_right = -0.026
+anchor_bottom = 39.418
+offset_left = 5.014
+offset_top = -0.376099
+offset_right = 151.014
+offset_bottom = 30.6239
+text = "get pack common"
+script = ExtResource("2_v06y3")
+button_node_name = &"Summon common pack"
+spawn_button_path = NodePath(".")
+grid_manager_path = NodePath("../../../../System/GridManager")
+camera_path = NodePath("../../../../System/Camera2D")
+parent_for_packs = NodePath("../../../..")
+center_ratio_x = 0.2
+center_ratio_y = 0.2
+
+[node name="System" type="Node2D" parent="."]
 
 [node name="Camera2D" type="Camera2D" parent="System"]
 script = ExtResource("1_8jnm7")
 
-[node name="UI" type="Node2D" parent="System"]
+[node name="Card Factory" type="Node2D" parent="System"]
+script = ExtResource("2_fykw1")
+blueprints_json_path = "res://GAME/data/cards/card_blueprint.json"
+only_groups = Array[String](["Card", ""])
+name_text_uppercase = false
+name_font_size = 10
+debug_log = true
 
 [node name="GridManager" type="Node2D" parent="System"]
 top_level = true
@@ -36,48 +178,44 @@ grid_outline_width = 2.0
 blocked_outline_color = Color(0, 0, 0, 0.9)
 blocked_outline_width = 3.0
 
-[node name="Map" type="Node2D" parent="."]
-position = Vector2(950, 540)
+[node name="pile" type="Node2D" parent="System/GridManager"]
+script = ExtResource("5_n84gd")
+grid_manager_path = NodePath("..")
 
-[node name="Main" type="Node2D" parent="Map"]
+[node name="Crafting" type="Node2D" parent="System"]
 
-[node name="Main_map" type="Sprite2D" parent="Map/Main"]
-position = Vector2(7.00002, 6.81877e-05)
-scale = Vector2(6.38, 6.42857)
-texture = ExtResource("5_h3kf7")
+[node name="RecipeManager" parent="System/Crafting" instance=ExtResource("7_okgc3")]
 
-[node name="Shop" type="Node2D" parent="Map"]
-position = Vector2(1920, 0)
+[node name="Economy" type="Node2D" parent="System"]
 
-[node name="Shop_map" type="Sprite2D" parent="Map/Shop"]
-position = Vector2(3.2608, 0)
-texture = ExtResource("12_yokv5")
+[node name="Coin_Model" type="Node2D" parent="System/Economy"]
+script = ExtResource("11_si33c")
+start_coin = 1
 
-[node name="Secret" type="Node2D" parent="Map"]
-position = Vector2(1920, 1080)
+[node name="Selling_Area" type="Node2D" parent="System/Economy"]
+position = Vector2(81, 1261)
+script = ExtResource("13_da35l")
+sell_area_path = NodePath("Area2D")
+coin_model_path = NodePath("../Coin_Model")
+anim_duration = 0.45
+anim_trans = 10
+anim_ease = 1
+delete_entire_pile_if_grouped = true
+reject_bump_distance = 25.0
 
-[node name="Main_map" type="Sprite2D" parent="Map/Secret"]
-position = Vector2(3.00001, -1.78814e-05)
-scale = Vector2(6.4, 6.42857)
-texture = ExtResource("5_h3kf7")
+[node name="Sprite2D" type="Sprite2D" parent="System/Economy/Selling_Area"]
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("12_rm3fb")
 
-[node name="Storage" type="Node2D" parent="Map"]
-position = Vector2(0, 1080)
+[node name="Area2D" type="Area2D" parent="System/Economy/Selling_Area"]
 
-[node name="Storage_map2" type="Sprite2D" parent="Map/Storage"]
-position = Vector2(3.2608, 0)
-texture = ExtResource("12_yokv5")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="System/Economy/Selling_Area/Area2D"]
+position = Vector2(-0.5, 0)
+shape = SubResource("RectangleShape2D_ua85g")
 
-[node name="Cardpack" parent="Map/Storage" instance=ExtResource("8_6pqdo")]
-position = Vector2(233, -308)
+[node name="Work Unit Base" parent="System" instance=ExtResource("13_mm6ls")]
+position = Vector2(49, 914)
 
-[node name="Cardpack3" parent="Map/Storage" instance=ExtResource("8_6pqdo")]
-
-[node name="Cardpack2" parent="Map/Storage" instance=ExtResource("8_6pqdo")]
-
-[node name="Economy" type="Node2D" parent="."]
-
-[node name="SellingArea" parent="Economy" instance=ExtResource("8_tti53")]
-position = Vector2(59, 1135)
-
-[node name="Crafting" type="Node2D" parent="."]
+[node name="Card Counter" type="Node2D" parent="System"]
+script = ExtResource("16_fneu7")
+board_root_path = NodePath("../../Map")

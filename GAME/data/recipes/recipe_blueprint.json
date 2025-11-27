@@ -1,0 +1,28 @@
+[
+  {
+	"IN_PUT": "Wood",
+	"ADD": "(+)",
+	"IN_PUT__1": "Wood",
+	"ADD__1": "(+)",
+	"IN_PUT__2": "Stone",
+	"ADD__2": "(+)",
+	"IN_PUT__3": "Stone",
+	"ADD__3": "(+)",
+	"IN_PUT__4": "N/A",
+	"ADD__4": "(=)",
+	"CARD_NAME": "Woodstone"
+  },
+  {
+	"IN_PUT": "Wood",
+	"ADD": "(+)",
+	"IN_PUT__1": "Stone",
+	"ADD__1": "(+)",
+	"IN_PUT__2": "N/A",
+	"ADD__2": "(+)",
+	"IN_PUT__3": "N/A",
+	"ADD__3": "(+)",
+	"IN_PUT__4": "N/A",
+	"ADD__4": "(=)",
+	"CARD_NAME": "Stonewood"
+  }
+]

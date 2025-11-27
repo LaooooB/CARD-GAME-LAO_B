@@ -1,7 +1,7 @@
-[gd_scene load_steps=4 format=3 uid="uid://b6qgliyxs8q1x"]
+[gd_scene load_steps=4 format=3 uid="uid://h2hepktefmq5"]
 
 [ext_resource type="Texture2D" uid="uid://dp2a6qmglld51" path="res://GAME/assets/sprites/gameplay/coine.jpg" id="1_sul5m"]
-[ext_resource type="Script" path="res://GAME/scripts/Gameplay/sellingarea.gd" id="2_i262p"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Economy/sellingarea.gd" id="2_i262p"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_mlvtn"]
 size = Vector2(119, 106)

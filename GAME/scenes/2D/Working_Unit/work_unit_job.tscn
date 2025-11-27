@@ -1,0 +1,79 @@
+[gd_scene load_steps=4 format=3 uid="uid://clx6jar13lxij"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Working_Unit/work_unit_job.gd" id="1_b40tq"]
+[ext_resource type="Texture2D" uid="uid://c7anhgn2t24im" path="res://GAME/assets/sprites/cards/cardbase.png" id="2_ndtmp"]
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_6d3gt"]
+
+[node name="WorkUnitJob" type="Control"]
+z_index = 100
+z_as_relative = false
+layout_mode = 3
+anchor_right = 0.054
+anchor_bottom = 0.088
+offset_right = -0.68
+offset_bottom = -0.0400085
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_b40tq")
+
+[node name="Shadow" type="TextureRect" parent="."]
+modulate = Color(0, 0, 0, 1)
+self_modulate = Color(0, 0, 0, 0.25098)
+layout_mode = 0
+offset_right = 145.0
+offset_bottom = 140.0
+texture = ExtResource("2_ndtmp")
+expand_mode = 1
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = -1
+offset_right = 136.0
+offset_bottom = 131.0
+color = Color(0.346489, 0.200682, 0.0927007, 1)
+
+[node name="Panel" type="NinePatchRect" parent="."]
+layout_mode = 0
+offset_right = 137.0
+offset_bottom = 140.0
+
+[node name="Header" type="VBoxContainer" parent="Panel"]
+layout_mode = 0
+offset_right = 137.0
+offset_bottom = 23.0
+
+[node name="Name" type="Label" parent="Panel/Header"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Mountain"
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel"]
+layout_mode = 0
+offset_top = 38.0
+offset_right = 138.0
+offset_bottom = 142.0
+
+[node name="LeftText" type="Label" parent="Panel/HBoxContainer"]
+layout_mode = 2
+text = "put here"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightSlotWrap" type="Label" parent="Panel/HBoxContainer"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Dropcard" type="TextureRect" parent="Panel/HBoxContainer/RightSlotWrap"]
+modulate = Color(0.514563, 0.309973, 0.161327, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = 6.5
+offset_top = -15.0
+offset_right = 52.5
+offset_bottom = 45.0
+texture = SubResource("CanvasTexture_6d3gt")
