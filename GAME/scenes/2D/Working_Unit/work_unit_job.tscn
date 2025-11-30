@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3 uid="uid://clx6jar13lxij"]
+[gd_scene load_steps=5 format=3 uid="uid://clx6jar13lxij"]
 
 [ext_resource type="Script" path="res://GAME/scripts/Working_Unit/work_unit_job.gd" id="1_b40tq"]
 [ext_resource type="Texture2D" uid="uid://c7anhgn2t24im" path="res://GAME/assets/sprites/cards/cardbase.png" id="2_ndtmp"]
+[ext_resource type="Script" path="res://GAME/scripts/Working_Unit/job_slot_manager.gd" id="3_f8e41"]
 
 [sub_resource type="CanvasTexture" id="CanvasTexture_6d3gt"]
 
@@ -16,6 +17,7 @@ offset_bottom = -0.0400085
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_b40tq")
+job_slot_root_path = NodePath("Job slot root")
 metadata/_edit_use_anchors_ = true
 
 [node name="Shadow" type="TextureRect" parent="."]
@@ -78,3 +80,9 @@ offset_top = -15.0
 offset_right = 52.5
 offset_bottom = 45.0
 texture = SubResource("CanvasTexture_6d3gt")
+
+[node name="Job slot root" type="Node2D" parent="."]
+script = ExtResource("3_f8e41")
+
+[node name="Job 1" type="Node2D" parent="Job slot root"]
+position = Vector2(101, 94)

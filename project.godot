@@ -21,6 +21,7 @@ Gametimemanager="*res://GAME/scripts/Gameplay/Game Time/game_time_manager.gd.gd"
 Gridmanager="*res://GAME/scripts/Card_Stack_Snap_Animation/grid_manager.gd"
 CardFactory="*res://GAME/scripts/System/cardfactory.gd"
 CardLimitManager="*res://GAME/scripts/Gameplay/Card Counter/card_limit_manager.gd"
+JobSlotManager="*res://GAME/scripts/Working_Unit/job_slot_manager.gd"
 
 [display]
 

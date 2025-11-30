@@ -1,4 +1,22 @@
-[gd_scene format=3 uid="uid://t65tgwft5gcs"]
+[gd_scene load_steps=10 format=3 uid="uid://t65tgwft5gcs"]
+
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/hover_ui.gd" id="1_3xm2r"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/esc_page.gd" id="1_m8phr"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/floating_menu.gd" id="1_p06d0"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Setting/setting_tabs_manager.gd" id="3_op5np"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_6hsae"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_ox4mj"]
+font_size = 15
+shadow_size = 5
+shadow_color = Color(0.176471, 0.176471, 0.176471, 0.823529)
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_2gr86"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_4iy6w"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_cvfx0"]
 
 [node name="Setting" type="Control"]
 layout_mode = 3
@@ -7,4 +25,346 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+z_index = 1
+layout_mode = 2
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 125
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
+
+[node name="HSplitContainer" type="HSplitContainer" parent="MarginContainer"]
+layout_mode = 2
+split_offset = 425
+dragger_visibility = 1
+
+[node name="VSplitContainer" type="VSplitContainer" parent="MarginContainer/HSplitContainer"]
+layout_mode = 2
+dragger_visibility = 1
+
+[node name="Setting Label" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 10
+size_flags_stretch_ratio = 0.0
+theme_override_font_sizes/font_size = 50
+text = "S e t t i n g"
+script = ExtResource("1_p06d0")
+
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HSplitContainer/VSplitContainer"]
+layout_mode = 2
+size_flags_stretch_ratio = 0.0
+theme_override_constants/margin_top = 50
+
+[node name="HSplitContainer" type="HSplitContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer"]
+layout_mode = 2
+split_offset = 200
+dragger_visibility = 1
+
+[node name="UI overall" type="PanelContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 8
+size_flags_stretch_ratio = 0.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI overall"]
+layout_mode = 2
+size_flags_stretch_ratio = 15.0
+theme_override_constants/separation = 20
+alignment = 1
 metadata/_edit_use_anchors_ = true
+
+[node name="Audio" type="Button" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI overall/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 8
+theme_override_font_sizes/font_size = 25
+text = "A u d i o"
+script = ExtResource("1_3xm2r")
+amplitude_min = 0.5
+amplitude_max = 1.5
+speed_min = 0.3
+speed_max = 0.9
+random_seed = 50
+hover_scale = 1.15
+hover_tween_time = 0.25
+hover_trans = 5
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
+
+[node name="Control" type="Button" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI overall/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 25
+text = "C o n t r o l"
+script = ExtResource("1_3xm2r")
+amplitude_min = 0.5
+amplitude_max = 1.5
+speed_min = 0.3
+speed_max = 0.9
+random_seed = 50
+hover_scale = 1.15
+hover_tween_time = 0.25
+hover_trans = 5
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
+
+[node name="Video" type="Button" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI overall/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 25
+text = "V i d e o"
+script = ExtResource("1_3xm2r")
+amplitude_min = 0.5
+amplitude_max = 1.5
+speed_min = 0.3
+speed_max = 0.9
+random_seed = 50
+hover_scale = 1.15
+hover_tween_time = 0.25
+hover_trans = 5
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
+
+[node name="Language" type="Button" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI overall/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 25
+text = "L a n g u a g e"
+script = ExtResource("1_3xm2r")
+amplitude_min = 0.5
+amplitude_max = 1.5
+speed_min = 0.3
+speed_max = 0.9
+random_seed = 50
+hover_scale = 1.15
+hover_tween_time = 0.25
+hover_trans = 5
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
+
+[node name="UI Detail" type="Control" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer" node_paths=PackedStringArray("buttons", "panels")]
+layout_mode = 2
+script = ExtResource("3_op5np")
+buttons = [NodePath("../UI overall/VBoxContainer/Control"), NodePath("../UI overall/VBoxContainer/Video"), NodePath("../UI overall/VBoxContainer/Audio"), NodePath("../UI overall/VBoxContainer/Language")]
+panels = [NodePath("VBoxContainer2/PanelContainer2/Control"), NodePath("VBoxContainer2/PanelContainer2/Video"), NodePath("VBoxContainer2/PanelContainer2/Audio"), NodePath("VBoxContainer2/PanelContainer2/Language")]
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail"]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = -0.283
+anchor_right = 0.113
+anchor_bottom = 1.283
+offset_top = 0.0430031
+offset_right = 0.29599
+offset_bottom = -0.0430298
+grow_vertical = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+alignment = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="PanelContainer2" type="PanelContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2"]
+layout_mode = 2
+
+[node name="Control" type="PanelContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_6hsae")
+
+[node name="TabContainer" type="TabContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control"]
+layout_mode = 2
+current_tab = 0
+
+[node name="camera" type="HBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 50
+alignment = 1
+metadata/_tab_index = 0
+
+[node name="up_down_left_right" type="VBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera"]
+layout_mode = 2
+theme_override_constants/separation = 25
+
+[node name="Up" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/up_down_left_right"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Up"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Down" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/up_down_left_right"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Down"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Left" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/up_down_left_right"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 0
+text = "Left"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Right" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/up_down_left_right"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Right"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="W_A_S_D" type="VBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera"]
+layout_mode = 2
+theme_override_constants/separation = 25
+alignment = 2
+
+[node name="W" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/W_A_S_D"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "W"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="S" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/W_A_S_D"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "S"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="A" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/W_A_S_D"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "A"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="D" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/W_A_S_D"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "D"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="↑_↓_←_→" type="VBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera"]
+layout_mode = 2
+theme_override_constants/separation = 25
+
+[node name="↑" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/↑_↓_←_→"]
+layout_mode = 2
+text = "↑"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="↓" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/↑_↓_←_→"]
+layout_mode = 2
+text = "↓"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="←" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/↑_↓_←_→"]
+layout_mode = 2
+text = "←"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="→" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/camera/↑_↓_←_→"]
+layout_mode = 2
+text = "→"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="gameplay" type="HBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 25
+metadata/_tab_index = 1
+
+[node name="Mouse" type="VBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay"]
+layout_mode = 2
+theme_override_constants/separation = 25
+
+[node name="Select" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Mouse"]
+layout_mode = 2
+text = "Select"
+horizontal_alignment = 1
+
+[node name="Interact" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Mouse"]
+layout_mode = 2
+text = "Interact"
+horizontal_alignment = 1
+
+[node name="Open Shop" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Mouse"]
+layout_mode = 2
+text = "Open Shop"
+horizontal_alignment = 1
+
+[node name="Quit" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Mouse"]
+layout_mode = 2
+text = "Quit"
+horizontal_alignment = 1
+
+[node name="Icon" type="VBoxContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay"]
+layout_mode = 2
+theme_override_constants/separation = 25
+
+[node name="Left click" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Icon"]
+layout_mode = 2
+text = "Left Click"
+label_settings = SubResource("LabelSettings_ox4mj")
+horizontal_alignment = 1
+
+[node name="Right click" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Icon"]
+layout_mode = 2
+text = "Right Click
+"
+horizontal_alignment = 1
+
+[node name="Tab" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Icon"]
+layout_mode = 2
+text = "Tab"
+horizontal_alignment = 1
+
+[node name="Esc" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Control/TabContainer/gameplay/Icon"]
+layout_mode = 2
+text = "Esc"
+horizontal_alignment = 1
+
+[node name="Video" type="PanelContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2"]
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_2gr86")
+
+[node name="Brightness" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Video"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 35
+text = "Brightness"
+
+[node name="Audio" type="PanelContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2"]
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_4iy6w")
+
+[node name="Loudness" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Audio"]
+layout_mode = 2
+text = "Loudness"
+
+[node name="Language" type="PanelContainer" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2"]
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_cvfx0")
+
+[node name="Chinese" type="Label" parent="MarginContainer/HSplitContainer/VSplitContainer/MarginContainer/HSplitContainer/UI Detail/VBoxContainer2/PanelContainer2/Language"]
+layout_mode = 2
+text = "Chinese"
+
+[node name="Esc" type="Control" parent="."]
+anchors_preset = 0
+script = ExtResource("1_m8phr")

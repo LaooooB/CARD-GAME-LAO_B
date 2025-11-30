@@ -1,0 +1,72 @@
+[gd_scene load_steps=2 format=3 uid="uid://bqfkhvetmm13v"]
+
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/start_new_game.gd" id="1_0i26i"]
+
+[node name="Game Main Menu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Game Name" type="Label" parent="."]
+layout_mode = 2
+anchor_left = 0.291
+anchor_top = 0.166
+anchor_right = 0.71
+anchor_bottom = 0.36
+offset_left = -0.720032
+offset_top = -0.280014
+offset_right = -0.200073
+offset_bottom = 0.199982
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 150
+text = "Card Game"
+horizontal_alignment = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="Buttons" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.633111
+anchor_right = 0.292812
+anchor_bottom = 1.0
+offset_top = 0.23999
+offset_right = -0.200012
+grow_vertical = 0
+theme_override_constants/separation = 28
+metadata/_edit_use_anchors_ = true
+
+[node name="Continue" type="Button" parent="Buttons"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 50
+text = "Continue
+"
+alignment = 0
+metadata/_edit_use_anchors_ = true
+
+[node name="Start New Game" type="Button" parent="Buttons"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 50
+text = "Start New Game"
+alignment = 0
+script = ExtResource("1_0i26i")
+fade_out_color = Color(0.315365, 0.112861, 0, 0.913725)
+fade_out_ease = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="Setting" type="Button" parent="Buttons"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 50
+text = "Setting
+"
+alignment = 0
+metadata/_edit_use_anchors_ = true
+
+[node name="Exit Game" type="Button" parent="Buttons"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 50
+text = "Exit Game"
+alignment = 0
+metadata/_edit_use_anchors_ = true

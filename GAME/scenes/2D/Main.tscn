@@ -1,6 +1,6 @@
-[gd_scene load_steps=20 format=3 uid="uid://cc607aoh18n2o"]
+[gd_scene load_steps=21 format=3 uid="uid://cc607aoh18n2o"]
 
-[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/main_enter_tween.gd" id="1_6kk05"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/main_enter_tween.gd" id="1_6kk05"]
 [ext_resource type="Script" path="res://GAME/scripts/System/camera/camera.gd" id="1_8jnm7"]
 [ext_resource type="Script" path="res://GAME/scripts/Gameplay/Economy/coinhud.gd" id="2_5appd"]
 [ext_resource type="Script" path="res://GAME/scripts/System/cardfactory.gd" id="2_fykw1"]
@@ -16,6 +16,7 @@
 [ext_resource type="PackedScene" uid="uid://utdjd6rbipxo" path="res://GAME/scenes/2D/Working_Unit/work_unit_base.tscn" id="13_mm6ls"]
 [ext_resource type="Script" path="res://GAME/scripts/Gameplay/Card Counter/card_limit_manager.gd" id="16_fneu7"]
 [ext_resource type="Script" path="res://GAME/scripts/Card_Stack_Snap_Animation/grid_manager.gd" id="18_0s2mq"]
+[ext_resource type="PackedScene" uid="uid://bktsipd0fgrqf" path="res://GAME/scenes/2D/cards/Crafting material/common/card_human_player.tscn" id="18_er5e8"]
 [ext_resource type="PackedScene" uid="uid://blug5f3tuhree" path="res://GAME/scenes/2D/Card_Stack_Snap_Animation/pile.tscn" id="19_isrik"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_rxydv"]
@@ -227,8 +228,11 @@ texture = ExtResource("12_rm3fb")
 position = Vector2(-0.5, 0)
 shape = SubResource("RectangleShape2D_ua85g")
 
-[node name="Work Unit Base" parent="System" instance=ExtResource("13_mm6ls")]
-position = Vector2(49, 914)
-
 [node name="Card Counter" type="Node2D" parent="System"]
 script = ExtResource("16_fneu7")
+
+[node name="Work Unit Base" parent="System" instance=ExtResource("13_mm6ls")]
+position = Vector2(61, 1427)
+
+[node name="card" parent="." instance=ExtResource("18_er5e8")]
+position = Vector2(321, 1328)

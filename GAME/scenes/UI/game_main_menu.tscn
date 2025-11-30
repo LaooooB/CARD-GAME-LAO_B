@@ -1,6 +1,14 @@
-[gd_scene load_steps=2 format=3 uid="uid://bqfkhvetmm13v"]
+[gd_scene load_steps=9 format=3 uid="uid://bqfkhvetmm13v"]
 
-[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/start_new_game.gd" id="1_0i26i"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/floating_menu.gd" id="1_j0ghq"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/start_new_game.gd" id="2_8p56p"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/continue.gd" id="2_aesor"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/setting.gd" id="3_06srd"]
+[ext_resource type="Script" path="res://GAME/scripts/System/Game Control/Main Menu/exit_game.gd" id="4_qrksv"]
+[ext_resource type="PackedScene" uid="uid://t65tgwft5gcs" path="res://GAME/scenes/UI/setting.tscn" id="5_72ngt"]
+[ext_resource type="Shader" path="res://GAME/scripts/System/Game Control/Setting/setting_blur.gdshader" id="6_82kej"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_phumr"]
 
 [node name="Game Main Menu" type="Control"]
 layout_mode = 3
@@ -9,6 +17,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 4
+metadata/_edit_use_anchors_ = true
 
 [node name="Game Name" type="Label" parent="."]
 layout_mode = 2
@@ -22,52 +32,98 @@ offset_right = -0.200073
 offset_bottom = 0.199982
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 150
-text = "Card Game
-"
+text = "CardGame"
 horizontal_alignment = 1
+script = ExtResource("1_j0ghq")
+amplitude_min = 2.5
+amplitude_max = 10.0
+speed_min = 0.5
+speed_max = 1.0
+random_seed = 50
 metadata/_edit_use_anchors_ = true
 
-[node name="Buttons" type="VBoxContainer" parent="."]
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = -1
-anchor_top = 0.633111
-anchor_right = 0.292812
-anchor_bottom = 1.0
-offset_top = 0.23999
-offset_right = -0.200012
-grow_vertical = 0
-theme_override_constants/separation = 28
+anchor_left = 0.0348958
+anchor_top = 0.630556
+anchor_right = 0.264583
+anchor_bottom = 0.896296
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 35
+alignment = 1
 metadata/_edit_use_anchors_ = true
 
-[node name="Continue" type="Button" parent="Buttons"]
+[node name="Continue" type="Button" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 50
-text = "Continue
+theme_override_font_sizes/font_size = 35
+text = "C o n t i n u e
 "
+flat = true
 alignment = 0
+script = ExtResource("2_aesor")
+random_seed = 4
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
 metadata/_edit_use_anchors_ = true
 
-[node name="Start New Game" type="Button" parent="Buttons"]
+[node name="New Game" type="Button" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 50
-text = "Start New Game"
+theme_override_font_sizes/font_size = 35
+text = "N e w    G a m e"
+flat = true
 alignment = 0
-script = ExtResource("1_0i26i")
-fade_out_color = Color(0.315365, 0.112861, 0, 0.913725)
+script = ExtResource("2_8p56p")
+amplitude_min = 0.5
+amplitude_max = 4.5
+speed_min = 0.6
+speed_max = 1.7
+random_seed = 7
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
+fade_out_color = Color(0.313726, 0.113725, 0, 0.913725)
 fade_out_ease = 1
 metadata/_edit_use_anchors_ = true
 
-[node name="Setting" type="Button" parent="Buttons"]
+[node name="Setting" type="Button" parent="VBoxContainer"]
+material = SubResource("ShaderMaterial_phumr")
 layout_mode = 2
-theme_override_font_sizes/font_size = 50
-text = "Setting
+theme_override_font_sizes/font_size = 35
+text = "S e t t i n g
 "
+flat = true
 alignment = 0
+script = ExtResource("3_06srd")
+hover_trans = 5
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
+settings_scene = ExtResource("5_72ngt")
+settings_slide_side = 0
+settings_slide_duration = 0.45
+settings_slide_trans = 5
+settings_dim_alpha = 0.75
+settings_blur_max = 0.5
+settings_right_dim_alpha = 0.5
+blur_shader_res = ExtResource("6_82kej")
 metadata/_edit_use_anchors_ = true
 
-[node name="Exit Game" type="Button" parent="Buttons"]
+[node name="Exit" type="Button" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 50
-text = "Exit Game"
+theme_override_font_sizes/font_size = 35
+text = "E x i t"
+flat = true
 alignment = 0
+script = ExtResource("4_qrksv")
+amplitude_min = 0.5
+amplitude_max = 4.5
+speed_min = 1.0
+speed_max = 1.5
+random_seed = 18
+normal_color = Color(0.929412, 0.898039, 0.815686, 1)
+hover_color = Color(0.909804, 0.8, 0.356863, 1)
+color_tween_time = 0.5
 metadata/_edit_use_anchors_ = true
