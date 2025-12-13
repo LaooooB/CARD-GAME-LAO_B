@@ -35,8 +35,12 @@ class_name recipemanager
 @export var fx_dust_min_v: float = 14.0
 @export var fx_dust_max_v: float = 38.0
 
-var _sig_to_output: Dictionary = {}
+# ========== 配方索引 ==========
+var _sig_to_output: Dictionary = {}   # 地图自动合成用：sig -> CARD_NAME
+var _desk_recipes: Dictionary = {}    # Desk 专用合成：sig -> CARD_NAME
+
 var _scene_by_name: Dictionary = {}
+var _row_by_name: Dictionary = {}  # key: card_name(lower) -> row(Dictionary)
 var _is_crafting_now: bool = false
 var _notify_script_res: Array = []
 var _last_spawned_card: Node2D = null
@@ -325,6 +329,8 @@ func _connect_pile(pile: Node) -> void:
 # ================== 配方/蓝图加载 ==================
 func _load_recipes() -> void:
 	_sig_to_output.clear()
+	_desk_recipes.clear()
+
 	for path in recipe_files:
 		if path == "" or not FileAccess.file_exists(path):
 			if debug_log:
@@ -342,8 +348,10 @@ func _load_recipes() -> void:
 			var d: Dictionary = data
 			if d.has("recipes") and typeof(d["recipes"]) == TYPE_ARRAY:
 				_parse_recipe_array(d["recipes"] as Array)
+
 	if debug_log:
-		print("[RecipeManager] loaded recipes:", _sig_to_output.size())
+		print("[RecipeManager] loaded board recipes:", _sig_to_output.size(),
+			"desk recipes:", _desk_recipes.size())
 
 func _parse_recipe_array(arr_any: Array) -> void:
 	var arr: Array = arr_any
@@ -351,14 +359,21 @@ func _parse_recipe_array(arr_any: Array) -> void:
 		if typeof(row_any) != TYPE_DICTIONARY:
 			continue
 		var row: Dictionary = row_any
+
+		# 读取所有可能的输入槽（IN_PUT 到 IN_PUT__9）
 		var inputs: Array = []
-		var keys: Array = ["IN_PUT", "IN_PUT__1", "IN_PUT__2", "IN_PUT__3", "IN_PUT__4"]
+		var keys: Array = [
+			"IN_PUT",
+			"IN_PUT__1", "IN_PUT__2", "IN_PUT__3", "IN_PUT__4",
+			"IN_PUT__5", "IN_PUT__6", "IN_PUT__7", "IN_PUT__8", "IN_PUT__9",
+		]
 		for k in keys:
 			if row.has(k):
 				var v_raw: String = String(row[k]).strip_edges()
 				var v: String = v_raw.to_lower()
 				if v != "" and v != "n/a":
 					inputs.append(v)
+
 		if inputs.is_empty():
 			continue
 		if not row.has("CARD_NAME"):
@@ -366,13 +381,25 @@ func _parse_recipe_array(arr_any: Array) -> void:
 		var out_name_raw: String = String(row["CARD_NAME"]).strip_edges()
 		if out_name_raw == "":
 			continue
+
+		# Station 字段：Desk = 只在 Desk 内合成；其它暂时仍视为地图配方
+		var station_raw: String = String(row.get("Station", "")).strip_edges()
+		var station_lc: String = station_raw.to_lower()
+
 		var sig: String = _make_signature_from_list(inputs)
-		_sig_to_output[sig] = out_name_raw
-		if debug_log:
-			print("[RecipeManager] recipe:", sig, "=>", out_name_raw)
+
+		if station_lc == "desk":
+			_desk_recipes[sig] = out_name_raw
+			if debug_log:
+				print("[RecipeManager] desk recipe:", sig, "=>", out_name_raw)
+		else:
+			_sig_to_output[sig] = out_name_raw
+			if debug_log:
+				print("[RecipeManager] recipe:", sig, "=>", out_name_raw, "(station:", station_raw, ")")
 
 func _load_card_blueprints() -> void:
 	_scene_by_name.clear()
+	_row_by_name.clear()
 	if card_blueprints_file == "" or not FileAccess.file_exists(card_blueprints_file):
 		if debug_log:
 			print("[RecipeManager] blueprints not found:", card_blueprints_file)
@@ -397,11 +424,84 @@ func _load_card_blueprints() -> void:
 		var nm: String = String(r.get("CARD_NAME", "")).strip_edges()
 		var sp: String = String(r.get("SCENE_PATH", "")).strip_edges()
 		if nm != "" and sp != "":
-			_scene_by_name[nm.to_lower()] = sp
+			var key: String = nm.to_lower()
+			_scene_by_name[key] = sp
+			_row_by_name[key] = r.duplicate(true)
 	if debug_log:
 		print("[RecipeManager] blueprints indexed:", _scene_by_name.size())
 
-# ================== 主逻辑：检测即开播 ==================
+# ================== 统一生成卡通道（与开卡包一致） ==================
+func _find_card_factory() -> Node:
+	var root := get_tree().get_root()
+	if root.has_node(^"/root/CardFactory"):
+		return root.get_node(^"/root/CardFactory")
+	# CardFactory 若挂在 Main.tscn 下，则通常是 /root/Main/CardFactory；这里用 find_child 兜底
+	var cs: Node = get_tree().current_scene
+	if cs != null:
+		var n1: Node = cs.find_child("CardFactory", true, false)
+		if n1 != null and is_instance_valid(n1):
+			return n1
+	var n2: Node = root.find_child("CardFactory", true, false)
+	if n2 != null and is_instance_valid(n2):
+		return n2
+	return null
+
+func _spawn_card_like_pack(card_name: String, spawn_parent: Node, spawn_pos: Vector2) -> Node2D:
+	var key: String = card_name.strip_edges().to_lower()
+	if not _row_by_name.has(key):
+		if debug_log:
+			print("[RecipeManager] spawn_like_pack: no blueprint row for:", card_name)
+		return null
+
+	var row: Dictionary = (_row_by_name[key] as Dictionary).duplicate(true)
+	row["CARD_NAME"] = card_name.strip_edges()
+
+	var scene_path: String = String(row.get("SCENE_PATH", "")).strip_edges()
+	if scene_path == "":
+		if debug_log:
+			print("[RecipeManager] spawn_like_pack: empty SCENE_PATH for:", card_name)
+		return null
+
+	var ps: PackedScene = load(scene_path) as PackedScene
+	if ps == null:
+		if debug_log:
+			print("[RecipeManager] spawn_like_pack: load failed:", scene_path)
+		return null
+
+	var node: Node = ps.instantiate()
+	var card2d: Node2D = node as Node2D
+	if card2d == null:
+		if node != null:
+			node.queue_free()
+		if debug_log:
+			print("[RecipeManager] spawn_like_pack: instance not Node2D for:", scene_path)
+		return null
+
+	# 关键：先把 row/名字塞进 meta，再入树，彻底避开 CardFactory 的任何 scene 兜底误判
+	card2d.set_meta("card_row", row)
+	card2d.set_meta("card_data", row)
+	card2d.set_meta("CARD_NAME", String(row.get("CARD_NAME", "")))
+
+	# 决定 spawn_parent（兜底）
+	if spawn_parent == null or not is_instance_valid(spawn_parent):
+		if get_tree().current_scene != null:
+			spawn_parent = get_tree().current_scene
+		else:
+			spawn_parent = self
+
+	spawn_parent.add_child(card2d)
+	card2d.global_position = spawn_pos
+
+	# 可选：强制贴一次（即使以后你关掉 auto_apply 也稳）
+	var cf: Node = _find_card_factory()
+	if cf != null and is_instance_valid(cf):
+		if cf.has_method("apply_to"):
+			cf.call("apply_to", card2d)
+		elif cf.has_method("apply_by_name"):
+			cf.call("apply_by_name", card2d, String(row.get("CARD_NAME", "")))
+
+	return card2d
+
 func _on_pile_changed(pile: Node) -> void:
 	if pile == null or not is_instance_valid(pile):
 		return
@@ -414,7 +514,7 @@ func _on_pile_changed(pile: Node) -> void:
 	if names.is_empty():
 		return
 
-	# 自触发保护
+	# 自触发保护（只剩一张且是刚刚合成的卡，不再触发）
 	if names.size() == 1:
 		for k in names.keys():
 			var cnt: int = int(names[k])
@@ -439,11 +539,16 @@ func _on_pile_changed(pile: Node) -> void:
 	if out_name_raw == "":
 		return
 	var out_name_key: String = out_name_raw.to_lower()
-	if not _scene_by_name.has(out_name_key):
+	if not _row_by_name.has(out_name_key):
 		if debug_log:
-			print("[RecipeManager] no blueprint for:", out_name_raw)
+			print("[RecipeManager] no blueprint row for:", out_name_raw)
 		return
-	var scene_path: String = _scene_by_name[out_name_key]
+	var row_out: Dictionary = _row_by_name[out_name_key]
+	var scene_path: String = String(row_out.get("SCENE_PATH", "")).strip_edges()
+	if scene_path == "":
+		if debug_log:
+			print("[RecipeManager] empty SCENE_PATH for:", out_name_raw)
+		return
 
 	_mark_pile_consumed(pile)
 	_play_craft_fx_and_execute(pile as Node2D, out_name_raw, scene_path, sig)
@@ -541,7 +646,7 @@ func _play_craft_fx_and_execute(pile2d: Node2D, out_name_raw: String, scene_path
 func _on_cancel_by_interaction(_arg: Variant = null) -> void:
 	pass
 
-# ================== 真正执行 Craft ==================
+# ================== 真正执行地图 Craft ==================
 func _finish_execute_craft(pile2d: Node2D, out_name_raw: String, scene_path: String, center: Vector2) -> void:
 	_is_crafting_now = true
 
@@ -555,28 +660,18 @@ func _finish_execute_craft(pile2d: Node2D, out_name_raw: String, scene_path: Str
 	var parent: Node = pile2d.get_parent()
 	_delete_pile_safe(pile2d)
 
-	var ps: PackedScene = load(scene_path) as PackedScene
-	if ps == null:
-		_is_crafting_now = false
-		return
-	var node: Node = ps.instantiate()
-	var card2d: Node2D = node as Node2D
+	# ✅ 统一走“开卡包通道”：先写 meta(row/data/name) 再入树
+	var card2d: Node2D = _spawn_card_like_pack(out_name_raw, parent, center)
 	if card2d == null:
 		_is_crafting_now = false
+		if debug_log:
+			print("[RecipeManager] craft spawn failed:", out_name_raw, " scene_path:", scene_path)
 		return
 
-	if parent != null:
-		parent.add_child(card2d)
-	else:
-		add_child(card2d)
-	card2d.global_position = center
 	card2d.set_meta("_crafted_tag", true)
-
-	var cf: Node = get_node_or_null(^"/root/CardFactory")
-	if cf != null and cf.has_method("apply_by_name"):
-		cf.call("apply_by_name", card2d, out_name_raw)
 	card2d.call_deferred("set_meta", "_crafted_tag", null)
 
+	# 出场动画起点
 	card2d.self_modulate.a = 0.0
 	card2d.scale = Vector2(0.86, 0.86)
 	_last_spawned_card = card2d
@@ -591,6 +686,106 @@ func _finish_execute_craft(pile2d: Node2D, out_name_raw: String, scene_path: Str
 		if mgr.has_method("add_cards"):
 			mgr.call("add_cards", 1)
 
+	if debug_log:
+		print("[RecipeManager] craft finished; consumed:%d spawned 1:%s" % [consumed_count, out_name_raw])
+
+func craft_in_desk(input_cards: Array, spawn_parent: Node, spawn_pos: Vector2) -> Node2D:
+	# 1. 过滤有效卡牌
+	var cards: Array[Node2D] = []
+	for v in input_cards:
+		var c: Node2D = v as Node2D
+		if c != null and is_instance_valid(c):
+			cards.append(c)
+
+	if cards.is_empty():
+		if debug_log:
+			print("[RecipeManager] craft_in_desk: no valid cards")
+		return null
+
+	# 2. 计算当前输入集合的 bag & signature
+	var bag: Dictionary = _bag_from_cards(cards)
+	if bag.is_empty():
+		if debug_log:
+			print("[RecipeManager] craft_in_desk: bag empty or invalid (missing card_data)")
+		return null
+
+	var sig: String = _make_signature_from_bag(bag)
+	if debug_log:
+		print("[RecipeManager] craft_in_desk sig:", sig)
+
+	# 3. 必须“完全对应”某个 Desk 配方
+	if not _desk_recipes.has(sig):
+		if debug_log:
+			print("[RecipeManager] craft_in_desk: no desk recipe for sig:", sig)
+		return null
+
+	var out_name_raw: String = String(_desk_recipes[sig]).strip_edges()
+	if out_name_raw == "":
+		if debug_log:
+			print("[RecipeManager] craft_in_desk: empty out name")
+		return null
+
+	# 4. 找蓝图 row（不再依赖 scene 做任何反推）
+	var out_key: String = out_name_raw.to_lower()
+	if not _row_by_name.has(out_key):
+		if debug_log:
+			print("[RecipeManager] craft_in_desk: no blueprint row for:", out_name_raw)
+		return null
+	var row_out: Dictionary = _row_by_name[out_key]
+	var scene_path: String = String(row_out.get("SCENE_PATH", "")).strip_edges()
+	if scene_path == "":
+		if debug_log:
+			print("[RecipeManager] craft_in_desk: empty SCENE_PATH for:", out_name_raw)
+		return null
+
+	# 5. 安全删除输入卡（注意调用 _pre_delete_cleanup）
+	var consumed_count: int = cards.size()
+	for c in cards:
+		if c == null or not is_instance_valid(c):
+			continue
+		_pre_delete_cleanup(c)
+		c.set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
+		c.set_deferred("visible", false)
+		c.call_deferred("queue_free")
+
+	# 6. 决定 spawn_parent（兜底）
+	if spawn_parent == null or not is_instance_valid(spawn_parent):
+		var root := get_tree().get_root()
+		var cards_layer := root.find_child("CardsLayer", true, false)
+		if cards_layer != null:
+			spawn_parent = cards_layer
+		elif get_tree().current_scene != null:
+			spawn_parent = get_tree().current_scene
+		else:
+			spawn_parent = self
+
+	# 7. 生成新卡（统一走“开卡包通道”：先写 meta(row/data/name) 再入树）
+	var card2d: Node2D = _spawn_card_like_pack(out_name_raw, spawn_parent, spawn_pos)
+	if card2d == null:
+		if debug_log:
+			print("[RecipeManager] craft_in_desk: spawn failed for:", out_name_raw, " scene_path:", scene_path)
+		return null
+
+	card2d.set_meta("_crafted_tag", true)
+	card2d.call_deferred("set_meta", "_crafted_tag", null)
+
+	card2d.self_modulate.a = 0.0
+	card2d.scale = Vector2(0.86, 0.86)
+	_last_spawned_card = card2d
+
+	# 8. 更新卡牌数量：-N + 1
+	var mgr := _get_card_limit_manager()
+	if mgr != null:
+		if consumed_count > 0 and mgr.has_method("remove_cards"):
+			mgr.call("remove_cards", consumed_count)
+		if mgr.has_method("add_cards"):
+			mgr.call("add_cards", 1)
+
+	if debug_log:
+		print("[RecipeManager] craft_in_desk finished; consumed:%d spawned 1:%s" %
+			[consumed_count, out_name_raw])
+
+	return card2d
 
 # ================== Bag / 签名 ==================
 func _bag_from_pile(pile: Node) -> Dictionary:
@@ -603,6 +798,27 @@ func _bag_from_pile(pile: Node) -> Dictionary:
 	for v in (arr_any as Array):
 		var c: Node = v
 		if c == null:
+			continue
+		if not c.has_meta("card_data"):
+			return {}
+		var row_any: Variant = c.get_meta("card_data")
+		if typeof(row_any) != TYPE_DICTIONARY:
+			return {}
+		var row: Dictionary = row_any
+		if not row.has("CARD_NAME"):
+			return {}
+		var nm_raw: String = String(row["CARD_NAME"]).strip_edges()
+		var nm: String = nm_raw.to_lower()
+		if nm == "":
+			return {}
+		bag[nm] = int(bag.get(nm, 0)) + 1
+	return bag
+
+func _bag_from_cards(cards: Array) -> Dictionary:
+	var bag: Dictionary = {}
+	for v in cards:
+		var c: Node = v
+		if c == null or not is_instance_valid(c):
 			continue
 		if not c.has_meta("card_data"):
 			return {}
@@ -744,7 +960,6 @@ func _request_limit_recalc() -> void:
 	_limit_recalc_pending = true
 	call_deferred("_do_limit_recalc")
 
-
 func _do_limit_recalc() -> void:
 	_limit_recalc_pending = false
 	var mgr := _get_card_limit_manager()
@@ -753,7 +968,6 @@ func _do_limit_recalc() -> void:
 			mgr.call("request_recalc")
 		elif mgr.has_method("recalculate_from_board"):
 			mgr.call("recalculate_from_board")
-
 
 func _get_card_limit_manager() -> Node:
 	var root := get_tree().get_root()

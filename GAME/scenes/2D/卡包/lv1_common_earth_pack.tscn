@@ -1,0 +1,31 @@
+[gd_scene load_steps=4 format=3 uid="uid://bkaodpavvxdo2"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Card_Packs/cardpack_control.gd" id="1_c27fc"]
+[ext_resource type="Texture2D" uid="uid://c2741fukm7lhw" path="res://GAME/assets/sprites/cards/1.2 Poker cards/11_1.2 Poker cards.png" id="2_qrvwc"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_b42gd"]
+size = Vector2(47, 63)
+
+[node name="Cardpack" type="Node2D"]
+script = ExtResource("1_c27fc")
+sprite_path = NodePath("Sprite")
+hit_full_path = NodePath("Area2D/CollisionShape2D")
+blueprints_path = "res://GAME/data/cards/card_blueprint.json"
+spawn_card_names = ["Stone", "Wood", "Grass", "Soil"]
+spawn_scatter = 75.0
+spawn_tween_duration = 1.0
+spawn_card_weights = [0.25, 0.25, 0.25, 0.25]
+spawn_tween_trans = 10
+vanish_duration = 0.55
+vanish_transition = 5
+vanish_end_scale = 0.2
+bounce_back_duration = 0.3
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_qrvwc")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2(0.5, -0.5)
+shape = SubResource("RectangleShape2D_b42gd")

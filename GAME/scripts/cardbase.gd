@@ -1,4 +1,4 @@
-extends Node2D
+extends Node2D 
 class_name Card
 
 # =========================
@@ -14,11 +14,10 @@ class_name Card
 # —— 拖拽顶层容器（一次赋值，反复使用）——
 @export var drag_layer_path: NodePath = ^"/root/DragLayer"	# 建议放一个 CanvasLayer 作为拖拽顶层
 
-# ——（新增）卡内 UI 相对层级（按顺序 0,1,2… 设置）——
-# 写节点“名字”（不是路径）。会递归查找同名 CanvasItem 并统一设置相对 z。
-@export var internal_z_names: Array[String] = ["Sprite2D", "NameLabel"]	# 需要就增删，顺序决定 z
+# —— 卡内 UI 相对层级（按顺序 0,1,2… 设置）——
+@export var internal_z_names: Array[String] = ["Sprite2D", "NameLabel"]
 
-# —— 点击判定与调试 ——
+# —— 点击判定与调试 —— 
 @export_range(0.0, 20.0, 0.5) var click_px_threshold: float = 6.0
 @export var click_ms_threshold: int = 220
 @export var click_flash_scale: float = 1.06
@@ -73,6 +72,9 @@ var _last_bridge_click_id: int = 0
 
 var _scale_tw: Tween
 
+# 拖出 job？
+var _drag_from_job_slot: bool = false
+
 # =========================
 # —— 生命周期 —— 
 # =========================
@@ -118,7 +120,7 @@ func _ready() -> void:
 	_apply_internal_z_order()
 
 # =========================
-# —— 拖拽跟随 —— 
+# —— 拖拽跟随 + 鼠标抬起兜底 —— 
 # =========================
 func _process(_dt: float) -> void:
 	if _dragging:
@@ -126,6 +128,10 @@ func _process(_dt: float) -> void:
 		var target: Vector2 = mouse_g - _drag_offset
 		_follow_to(target)
 		emit_signal("drag_moved", self, mouse_g)
+
+		# —— 兜底：就算 UI 吃掉了 MouseButton 事件，这里也能结束拖拽 —— 
+		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_end_drag_and_drop()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _dragging and event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -180,9 +186,11 @@ func _on_pressed_full() -> void:
 			var cards: Array = _pile_ref.call("get_cards")
 			if cards.size() > 0:
 				top_index = cards.size() - 1
+
 		var my_index := -1
 		if _pile_ref.has_method("index_of_card"):
 			my_index = int(_pile_ref.call("index_of_card", self))
+
 		if my_index == top_index:
 			if _pile_ref.has_method("extract_from"):
 				_pile_ref.call("extract_from", my_index)
@@ -213,47 +221,47 @@ func begin_drag(mode: StringName = &"single") -> void:
 	_drag_mode = mode
 	_pre_drag_global = global_position
 
-	# ★ 新增：通知 JobSlotManager，这张卡已从任何 job 槽中被拿起
-	var job_slot_manager := get_node_or_null(^"/root/JobSlotManager")
+	# 记录这次拖拽是不是从 work_unit_job 的槽里开始的
+	_drag_from_job_slot = _is_under_work_unit_job()
+
+	# 通知 JobSlotManager：这张卡已经从 job 槽里拿起来（清理槽占用）
+	var job_slot_manager: Node = get_node_or_null(^"/root/JobSlotManager")
 	if job_slot_manager != null:
 		job_slot_manager.call("on_card_begin_drag", self)
 
-	# 视觉放大（用 tween，避免与 hover 收回的直接赋值互相抢写）
+	# 视觉放大（用 tween）
 	if pickup_scale > 0.0 and absf(pickup_scale - 1.0) > 0.0001:
 		_tween_scale_to(_orig_scale * Vector2(pickup_scale, pickup_scale), 0.10, Tween.TRANS_QUAD, Tween.EASE_OUT)
 
 	# —— 一次性换父到拖拽顶层 —— 
 	_pre_drag_parent = get_parent()
-	_pre_drag_sibling_idx = _pre_drag_parent.get_children().find(self) if _pre_drag_parent else -1
+	_pre_drag_sibling_idx = _pre_drag_parent.get_children().find(self) if _pre_drag_parent != null else -1
 
 	if is_instance_valid(_drag_layer):
-		var gp := global_position
+		var gp: Vector2 = global_position
 		reparent(_drag_layer)
 		global_position = gp
 	else:
-		# 兜底（没有 DragLayer 时）——只做一次安全抬高
+		# 兜底（没有 DragLayer）
 		z_as_relative = false
-		var z_cap: int = RenderingServer.CANVAS_ITEM_Z_MAX - 1	# 通常 4095
-		var headroom: int = 3	# 0=卡面, 1=高亮, 2=名字
-		var safe_parent_top: int = max(0, z_cap - headroom)	# 父最多 4092
+		var z_cap: int = RenderingServer.CANVAS_ITEM_Z_MAX - 1
+		var headroom: int = 3
+		var safe_parent_top: int = max(0, z_cap - headroom)
 		if drag_z >= 0:
 			z_index = clamp(drag_z, 0, safe_parent_top)
 
-	# —— 应用卡内相对层级（基于 internal_z_names 的顺序） —— 
+	# 应用内部 UI 层级
 	_apply_internal_z_order()
 
 	# 拖拽偏移
 	var mouse_g: Vector2 = get_global_mouse_position()
 	_drag_offset = mouse_g - global_position
 
-	# 仅拖拽时跑 _process
 	set_process(true)
 
-	# 把自己加入“正在拖拽”组
 	if not is_in_group("dragging_cards"):
 		add_to_group("dragging_cards", true)
 
-	# 用 deferred 广播
 	get_tree().call_group_flags(SceneTree.GROUP_CALL_DEFERRED, "card_controllers", "on_global_drag_started")
 
 	emit_signal(&"drag_started", self)
@@ -264,26 +272,41 @@ func _end_drag_and_drop() -> void:
 	_dragging = false
 	emit_signal("drag_ended", self)
 
-	# ★ 新增：优先尝试丢进 WorkUnit 的 job 槽
-	var job_slot_manager := get_node_or_null(^"/root/JobSlotManager")
-	if job_slot_manager != null:
-		var snapped: bool = bool(job_slot_manager.call("try_snap_card", self, global_position))
-		if snapped:
-			# 成功 snap 到某个 workunit 的槽里：
-			# 不再回原父，而是维持 WorkUnitBase._try_snap_card 已经设置好的 parent/position
-			_restore_visual_post_drop(true)
-			set_process(false)
-			if is_in_group("dragging_cards"):
-				remove_from_group("dragging_cards")
-			return
+	var accepted: bool = false
 
-	var accepted := false
+	# 1. 只有“从 Grid 开始拖”的情况才尝试 job 吸附
+	#    —— 从 job 槽里拖出来 (_drag_from_job_slot == true) 的，不再重新吸回 job，只交给 Grid。
+	if not _drag_from_job_slot:
+		var job_slot_manager: Node = get_node_or_null(^"/root/JobSlotManager")
+		if job_slot_manager != null:
+			var snapped: bool = bool(job_slot_manager.call("try_snap_card", self, global_position))
+			if snapped:
+				# 成功被某个 work_unit_job 吸走：parent / 位置都在 work_unit_job._try_snap_card 里处理好了
+				_restore_visual_post_drop(true)
+				set_process(false)
+				if is_in_group("dragging_cards"):
+					remove_from_group("dragging_cards")
+				_drag_from_job_slot = false
+				return
 
-	# 单卡落子：交给 Grid；失败则“回弹 + bump”
+	# 2. job 没接收（或本次本来就是从 job 里拖出来），交给 GridManager
 	if _drag_mode == &"single" and _grid != null and is_instance_valid(_grid) and _grid.has_method("drop_card"):
 		accepted = bool(_grid.call("drop_card", self, global_position))
 
+	# Debug：看这次到底谁接了
+	var parent_path := ""
+	if get_parent() != null:
+		parent_path = get_parent().get_path()
+	print("[CARD DROP] name=%s from_job=%s accepted=%s pos=%s parent=%s" % [
+		name,
+		str(_drag_from_job_slot),
+		str(accepted),
+		str(global_position),
+		parent_path
+	])
+
 	if not accepted:
+		# 没人接收：用动画回到拖拽前位置 & 回到拖拽前父节点（grid → grid，job → job）
 		if _anim != null and _anim.has_method("tween_to"):
 			_anim.call("tween_to", _pre_drag_global, 0.16, 1.0, _orig_z)
 			if _anim.has_method("bump"):
@@ -292,14 +315,20 @@ func _end_drag_and_drop() -> void:
 		else:
 			global_position = _pre_drag_global
 
-	# 放回原父
-	_restore_parent_if_needed()
+		_restore_parent_if_needed()
+	else:
+		# ★ 只要 Grid 接收成功，就强制从任何 work_unit_job 树下面脱离
+		_ensure_detached_from_job_tree()
+
+	# 统一的视觉恢复 + 收尾
 	_restore_visual_post_drop(accepted)
 
-	# 拖拽结束关闭 _process
 	set_process(false)
 	if is_in_group("dragging_cards"):
 		remove_from_group("dragging_cards")
+
+	# 重置标记
+	_drag_from_job_slot = false
 
 func cancel_drag() -> void:
 	if _dragging:
@@ -427,6 +456,40 @@ func _detach_from_pile_to_world() -> void:
 	global_position = gp
 	set_pile(null)
 
+# ===== 从 job 树中强制脱离，挂回世界卡牌父节点 =====
+func _ensure_detached_from_job_tree() -> void:
+	# 沿着父节点往上爬，看看是不是挂在任何 work_unit_job 下面
+	var p: Node = get_parent()
+	var found_job: Node = null
+	while p != null:
+		if p is work_unit_job:
+			found_job = p
+			break
+		p = p.get_parent()
+
+	if found_job == null:
+		# 不在任何 job 下面，啥都不用做
+		return
+
+	# 找一个“世界层”的卡牌父节点（GridManager 的 Cards/CardRoot 等）
+	var world_parent := _resolve_world_card_parent()
+	if world_parent == null or not is_instance_valid(world_parent):
+		return
+
+	var gp := global_position
+	reparent(world_parent, true)
+	global_position = gp
+
+	# 清空“拖拽前父节点”的缓存，避免之后 restore 回到 job 内
+	_pre_drag_parent = null
+	_pre_drag_sibling_idx = -1
+
+	print("[CARD JOB DETACH] card=%s detatched_from=%s new_parent=%s" % [
+		name,
+		str(found_job.get_path()),
+		str(world_parent.get_path())
+	])
+
 # ===== 确保自身有 CardAnimation =====
 func _ensure_anim_on_self() -> CardAnimation:
 	if _anim != null and is_instance_valid(_anim):
@@ -450,12 +513,10 @@ func _try_sync_click_id() -> void:
 # —— 按列表名应用内部 UI 相对层级 —— 
 # =========================
 func _apply_internal_z_order() -> void:
-	# 例：["Sprite2D","Glow","NameLabel"] -> 分别设置 z=0,1,2
 	var z := 0
 	for n in internal_z_names:
 		if n.is_empty():
 			continue
-		# 递归匹配名字为 n 的 CanvasItem（可同时命中多个同名节点）
 		var matches: Array = find_children(n, "CanvasItem", true, false)
 		var any := false
 		for node in matches:
@@ -467,7 +528,7 @@ func _apply_internal_z_order() -> void:
 					ci.show_behind_parent = false
 					any = true
 		if any:
-			z += 1	# 只有在至少命中一个时才推进层级
+			z += 1
 
 func _tween_scale_to(target: Vector2, dur: float = 0.12, trans := Tween.TRANS_QUAD, ease := Tween.EASE_OUT) -> void:
 	if _scale_tw and _scale_tw.is_running():
@@ -475,3 +536,11 @@ func _tween_scale_to(target: Vector2, dur: float = 0.12, trans := Tween.TRANS_QU
 	_scale_tw = create_tween()
 	_scale_tw.set_trans(trans).set_ease(ease)
 	_scale_tw.tween_property(self, "scale", target, dur)
+
+func _is_under_work_unit_job() -> bool:
+	var p: Node = get_parent()
+	while p != null:
+		if p is work_unit_job:
+			return true
+		p = p.get_parent()
+	return false

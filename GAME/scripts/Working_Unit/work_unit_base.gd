@@ -39,13 +39,13 @@ var job_anchor_mode: int = 0
 @export var job_open_scale: Vector2 = Vector2(0.94, 0.94)
 @export var job_close_scale: Vector2 = Vector2(0.94, 0.94)
 
-
 # =========================
 # —— 运行期状态 —— 
 # =========================
 @export var footprint_cols: int = 2
 @export var footprint_rows: int = 2
 var _blocked_cells: Array[int] = []	# 当前由本 WorkUnit 占用（禁用）的格子
+
 var _grid: Node = null
 var _sprite: Sprite2D = null
 var _hit_full: Area2D = null
@@ -107,13 +107,14 @@ func _ready() -> void:
 	# —— 初次进入场景，按当前位置封 2×2 脚印 —— 
 	_refresh_footprint()
 
-	# —— 向 JobSlotManager 注册自己 —— 
-	var jsm := get_node_or_null(^"/root/JobSlotManager")
+	# —— 向 JobSlotManager 注册自己（供 snap 用） —— 
+	var jsm: Node = get_node_or_null(^"/root/JobSlotManager")
 	if jsm != null:
 		jsm.call("register_work_unit", self)
 
+
 func _exit_tree() -> void:
-	var jsm := get_node_or_null(^"/root/JobSlotManager")
+	var jsm: Node = get_node_or_null(^"/root/JobSlotManager")
 	if jsm != null:
 		jsm.call("unregister_work_unit", self)
 
@@ -121,14 +122,21 @@ func _exit_tree() -> void:
 # —— 帧逻辑（拖拽跟随 + 兜底结束） —— 
 # =========================
 func _process(_dt: float) -> void:
-	# 拖拽跟随
+	# 拖拽中：跟随鼠标，并同步弹窗位置
 	if _dragging:
 		var mouse_g: Vector2 = get_global_mouse_position()
 		global_position = mouse_g - _drag_offset
 
+		# 拖动时同步弹窗位置
+		_update_job_popup_position_to_right_if_visible()
+
 		# —— 兜底：如果左键已经弹起，但因为事件时序没有走到结束逻辑，强制收尾 —— 
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_end_drag_and_drop()
+	else:
+		# 不在拖拽，但弹窗是开着的（比如正在被 Grid 的 Tween 吸附移动）
+		if _is_popup_visible():
+			_update_job_popup_position_to_right_if_visible()
 
 # =========================
 # —— 命中区事件 —— 
@@ -144,7 +152,7 @@ func _on_hit_full_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> 
 			# 鼠标抬起时，无论是否拖拽中，都要清理状态；若正在拖拽，直接结束
 			_pressing_left = false
 			if _dragging:
-				_end_drag_and_drop()	# 把结束拖拽放回 input_event，避免依赖 _unhandled_input
+				_end_drag_and_drop()
 			return
 
 	# 鼠标移动：在左键按住时才开始拖拽
@@ -166,8 +174,9 @@ func _begin_drag() -> void:
 	_dragging = true
 	_pre_drag_global = global_position
 
-	# —— 开始拖拽时：自动关闭弹窗 —— 
-	_hide_work_unit_job(true)
+	# 以前这里会强制关闭 job 弹窗：
+	# _hide_work_unit_job(true)
+	# 现在改成：拖拽 WorkUnit 时，不自动收回弹窗，让玩家自己右键关
 
 	# —— 开始拖拽前释放旧脚印（避免移动途中仍占用旧 2×2） —— 
 	_unblock_footprint()
@@ -190,8 +199,9 @@ func _begin_drag() -> void:
 	var mouse_g: Vector2 = get_global_mouse_position()
 	_drag_offset = mouse_g - global_position
 
-	# 仅拖拽时跑 _process
-	set_process(true)
+	# 状态统一交给 _update_process_state 控制
+	_update_process_state()
+
 
 func _end_drag_and_drop() -> void:
 	if not _dragging:
@@ -201,8 +211,9 @@ func _end_drag_and_drop() -> void:
 	# 目标位置：默认是当前松手位置
 	var target_pos: Vector2 = global_position
 
-	# 若有 GridManager，则吸附到最近单元格中心（和之前 drop 逻辑一致）
+	# 若有 GridManager，则吸附到最近单元格中心
 	if _grid != null and is_instance_valid(_grid) and _grid.has_method("world_to_cell_center"):
+		@warning_ignore("shadowed_global_identifier")
 		var snapped: Vector2 = _grid.call("world_to_cell_center", global_position)
 		target_pos = snapped
 
@@ -218,8 +229,13 @@ func _end_drag_and_drop() -> void:
 	# 根据最终目标格刷新 2×2 占格
 	_refresh_footprint()
 
-	# 停止 _process
-	set_process(false)
+	# 决定还要不要跑 _process：
+	# 如果弹窗还开着，就继续跑（跟随 Tween）；
+	# 如果弹窗关了且不在拖拽，就停掉。
+	_update_process_state()
+
+	# 保险：立刻对齐一次位置，避免第一帧 tween 前出现轻微错位
+	_update_job_popup_position_to_right_if_visible()
 
 func _animate_snap_to(target_pos: Vector2) -> void:
 	# 优先走 GridManager 的 CardAnimation 工具，保证和堆的动画风格一致
@@ -243,7 +259,7 @@ func _ensure_job_popup() -> Node:
 	if _job_popup != null and is_instance_valid(_job_popup):
 		return _job_popup
 
-	# 1）优先：如果你以后真的在某个场景里给 instance_path 赋值了，就直接用那个实例
+	# 若在某个场景里真的给 instance_path 赋值过，就优先用那个实例
 	if work_unit_job_instance_path != NodePath(""):
 		var inst: Node = get_node_or_null(work_unit_job_instance_path)
 		if inst != null:
@@ -255,27 +271,27 @@ func _ensure_job_popup() -> Node:
 				_job_popup_ci.visible = false
 			return _job_popup
 
-	# 2）否则：必须有 PackedScene，才能自己实例化一个
+	# 否则：必须有 PackedScene，才能自己实例化一个
 	if work_unit_job_scene == null:
 		push_warning("[WorkUnitBase] work_unit_job_scene 未设置，且未提供现有实例路径。")
 		return null
 
-	# 3）决定挂到哪个父节点（不依赖你在 Inspector 里设置 NodePath）
+	# 决定挂到哪个父节点（不强依赖 Inspector 的 NodePath）
 	var parent: Node = null
 
-	# 3.1 如果你在某个实例上真的填了 work_unit_job_parent_path，就优先用
+	# 1）如果在某个实例上填了 work_unit_job_parent_path，就优先用
 	if work_unit_job_parent_path != NodePath(""):
 		parent = get_node_or_null(work_unit_job_parent_path)
 
-	# 3.2 没填的话，尝试在整棵树里找一个叫 "PopupUILayer" 的节点，当作 UI 层
+	# 2）没填的话，尝试在整棵树里找一个叫 "PopupUILayer" 的节点，当作 UI 层
 	if parent == null:
 		parent = get_tree().root.find_child("PopupUILayer", true, false)
 
-	# 3.3 还找不到，就退回到 current_scene（整张地图的根节点）
+	# 3）还找不到就退回 current_scene
 	if parent == null:
 		parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
 
-	# 4）真正实例化弹窗
+	# 实例化弹窗
 	_job_popup = work_unit_job_scene.instantiate()
 	parent.add_child(_job_popup)
 
@@ -304,7 +320,9 @@ func _show_work_unit_job(animated: bool) -> void:
 	if _job_popup_ci == null:
 		_job_popup_ci = _job_popup as CanvasItem
 	if _job_popup_ci == null:
-		_job_popup.visible = true
+		if _job_popup != null:
+			_job_popup.visible = true
+		_update_process_state()   # ← 新增：弹窗开了，需要跑 _process
 		return
 
 	_kill_popup_tween()
@@ -327,6 +345,10 @@ func _show_work_unit_job(animated: bool) -> void:
 		_job_popup_ci.modulate = end_col
 		_job_popup_ci.scale = end_scale
 
+	_update_process_state()       # ← 新增：弹窗开了，需要跑 _process
+
+
+
 func _hide_work_unit_job(animated: bool) -> void:
 	if not _is_popup_visible():
 		return
@@ -334,7 +356,9 @@ func _hide_work_unit_job(animated: bool) -> void:
 	if _job_popup_ci == null:
 		_job_popup_ci = _job_popup as CanvasItem
 	if _job_popup_ci == null:
-		_job_popup.visible = false
+		if _job_popup != null:
+			_job_popup.visible = false
+		_update_process_state()   # ← 弹窗直接关了
 		return
 
 	_kill_popup_tween()
@@ -351,11 +375,13 @@ func _hide_work_unit_job(animated: bool) -> void:
 		_popup_tw.finished.connect(func() -> void:
 			if is_instance_valid(_job_popup_ci):
 				_job_popup_ci.visible = false
+			_update_process_state()   # ← 动画结束时再关 process
 		)
 	else:
 		_job_popup_ci.modulate = end_col
 		_job_popup_ci.scale = end_scale
 		_job_popup_ci.visible = false
+		_update_process_state()       # ← 立即关 process（如果不在拖）
 
 func _is_popup_visible() -> bool:
 	if _job_popup_ci != null:
@@ -364,16 +390,19 @@ func _is_popup_visible() -> bool:
 		return _job_popup.visible
 	return false
 
+
 func _kill_popup_tween() -> void:
 	if _popup_tw != null and _popup_tw.is_running():
 		_popup_tw.kill()
 		_popup_tw = null
+
 
 func _update_job_popup_position_to_right_if_visible() -> void:
 	if _is_popup_visible():
 		var popup: Node = _ensure_job_popup()
 		if popup != null:
 			_position_job_popup_to_right(popup)
+
 
 func _position_job_popup_to_right(popup: Node) -> void:
 	var pos: Vector2 = _calc_right_anchor_global()
@@ -385,6 +414,7 @@ func _position_job_popup_to_right(popup: Node) -> void:
 		return
 	if "global_position" in popup:
 		popup.set("global_position", pos)
+
 
 func _calc_right_anchor_global() -> Vector2:
 	var w: float = 64.0
@@ -415,7 +445,7 @@ func _calc_right_anchor_global() -> Vector2:
 			2:
 				base = global_position + Vector2(0.0, -half_h)	# Top
 			3:
-				base = global_position + Vector2(0.0, half_h)		# Bottom
+				base = global_position + Vector2(0.0, half_h)	# Bottom
 			4:
 				base = global_position + Vector2(half_w, -half_h)	# TopRight
 			5:
@@ -432,6 +462,32 @@ func _calc_right_anchor_global() -> Vector2:
 	return base + job_offset_right + job_custom_offset
 
 # =========================
+# —— Job 槽：转发到 work_unit_job —— 
+# =========================
+func _try_snap_card(card: Node2D, drop_global: Vector2) -> bool:
+	# JobSlotManager 会遍历所有 WorkUnitBase 调用这个
+	if card == null or not is_instance_valid(card):
+		return false
+	if not _is_popup_visible():
+		return false
+
+	var popup: Node = _ensure_job_popup()
+	if popup == null or not is_instance_valid(popup):
+		return false
+
+	if popup.has_method("_try_snap_card"):
+		return bool(popup.call("_try_snap_card", card, drop_global))
+
+	return false
+
+
+func _on_card_begin_drag(card: Node2D) -> void:
+	if card == null or not is_instance_valid(card):
+		return
+	if _job_popup != null and is_instance_valid(_job_popup) and _job_popup.has_method("_on_card_begin_drag"):
+		_job_popup.call("_on_card_begin_drag", card)
+
+# =========================
 # —— 占格（2×2）工具 —— 
 # =========================
 func _cells_footprint_at(base_cell: int) -> Array[int]:
@@ -439,7 +495,7 @@ func _cells_footprint_at(base_cell: int) -> Array[int]:
 	if _grid == null or base_cell < 0:
 		return out
 
-	# 读取网格行列：优先用 getter；否则直接读导出属性；再不济用 get() 兜底
+	# 读取网格行列：优先用 getter；否则尝试属性；再不济用 get()
 	var total_cols: int = 0
 	var total_rows: int = 0
 	if _grid.has_method("get_cols"):
@@ -460,28 +516,34 @@ func _cells_footprint_at(base_cell: int) -> Array[int]:
 	if total_cols <= 0 or total_rows <= 0:
 		return out
 
+	@warning_ignore("integer_division")
 	var r: int = base_cell / total_cols
 	var c: int = base_cell % total_cols
 
-	for dy in range(footprint_rows):
-		for dx in range(footprint_cols):
+	for dy: int in range(footprint_rows):
+		for dx: int in range(footprint_cols):
 			var cc: int = c + dx
 			var rr: int = r + dy
 			if cc >= 0 and rr >= 0 and cc < total_cols and rr < total_rows:
 				out.append(rr * total_cols + cc)
+
 	return out
+
 
 func _unblock_footprint() -> void:
 	if _grid == null or _blocked_cells.is_empty():
 		_blocked_cells.clear()
 		return
+
 	if _grid.has_method("unblock_many"):
 		_grid.call("unblock_many", _blocked_cells)
 	else:
-		for c in _blocked_cells:
+		for c: int in _blocked_cells:
 			if _grid.has_method("unblock_cell"):
 				_grid.call("unblock_cell", c)
+
 	_blocked_cells.clear()
+
 
 func _refresh_footprint() -> void:
 	if _grid == null:
@@ -502,7 +564,6 @@ func _refresh_footprint() -> void:
 
 	_blocked_cells = cells
 
-
 # =========================
 # —— 辅助 —— 
 # =========================
@@ -511,14 +572,17 @@ func _restore_parent_if_needed() -> void:
 		_pre_drag_parent = null
 		_pre_drag_sibling_idx = -1
 		return
+
 	if get_parent() != _pre_drag_parent:
 		var gp: Vector2 = global_position
 		reparent(_pre_drag_parent)
 		if _pre_drag_sibling_idx >= 0 and _pre_drag_sibling_idx < _pre_drag_parent.get_child_count():
 			_pre_drag_parent.move_child(self, _pre_drag_sibling_idx)
 		global_position = gp
+
 	_pre_drag_parent = null
 	_pre_drag_sibling_idx = -1
+
 
 func _restore_visual_post_drop() -> void:
 	if not scale.is_equal_approx(_orig_scale):
@@ -526,6 +590,8 @@ func _restore_visual_post_drop() -> void:
 	z_index = _orig_z
 	z_as_relative = _orig_zrel
 
+
+@warning_ignore("shadowed_global_identifier")
 func _tween_scale_to(target: Vector2, dur: float = 0.12, trans: Tween.TransitionType = Tween.TRANS_QUAD, ease: Tween.EaseType = Tween.EASE_OUT) -> void:
 	if _scale_tw != null and _scale_tw.is_running():
 		_scale_tw.kill()
@@ -533,23 +599,7 @@ func _tween_scale_to(target: Vector2, dur: float = 0.12, trans: Tween.Transition
 	_scale_tw.set_trans(trans).set_ease(ease)
 	_scale_tw.tween_property(self, "scale", target, dur)
 
-# 供 JobSlotManager 调用：尝试把卡丢进这个 WorkUnit 对应的弹窗
-func _try_snap_card(card: Node2D, drop_global: Vector2) -> bool:
-	# 如果弹窗都没开，就直接拒绝
-	if not _is_popup_visible():
-		return false
-
-	var popup: Node = _ensure_job_popup()
-	if popup == null or not is_instance_valid(popup):
-		return false
-
-	if popup.has_method("_try_snap_card"):
-		return bool(popup.call("_try_snap_card", card, drop_global))
-
-	return false
-
-
-# 供 JobSlotManager 调用：卡开始拖拽时，把弹窗里对应槽位清掉
-func _on_card_begin_drag(card: Node2D) -> void:
-	if _job_popup != null and is_instance_valid(_job_popup) and _job_popup.has_method("_on_card_begin_drag"):
-		_job_popup.call("_on_card_begin_drag", card)
+func _update_process_state() -> void:
+	# 只要“在拖拽”或者“弹窗是打开的”，就需要跑 _process
+	var should_process: bool = _dragging or _is_popup_visible()
+	set_process(should_process)

@@ -1,0 +1,38 @@
+[gd_scene load_steps=5 format=3 uid="uid://cm3q6qb1aipeg"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Working_Unit/work_unit_base.gd" id="1_j18if"]
+[ext_resource type="PackedScene" uid="uid://crijislsb7g8g" path="res://GAME/scenes/2D/Working_Unit/crafting_desk_job.tscn" id="2_qynp3"]
+[ext_resource type="Texture2D" uid="uid://bjophjsuamxlm" path="res://GAME/assets/sprites/cards/1.2 Poker cards/82_1.2 Poker cards.png" id="3_hieyl"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1hf2g"]
+size = Vector2(46.5, 62)
+
+[node name="Work Unit Base" type="Node2D"]
+script = ExtResource("1_j18if")
+work_unit_job_scene = ExtResource("2_qynp3")
+footprint_cols = 1
+footprint_rows = 1
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("3_hieyl")
+
+[node name="hit_full" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="hit_full"]
+position = Vector2(0.25, -1)
+shape = SubResource("RectangleShape2D_1hf2g")
+
+[node name="NameLabel" type="Label" parent="."]
+z_index = 4096
+anchors_preset = -1
+anchor_left = -0.012
+anchor_top = -0.029
+anchor_right = 0.013
+offset_left = -23.0
+offset_top = -31.0
+offset_right = -22.0
+offset_bottom = -8.66667
+size_flags_horizontal = 0
+size_flags_vertical = 0
+horizontal_alignment = 1
+vertical_alignment = 1

@@ -1,0 +1,166 @@
+[gd_scene load_steps=4 format=3 uid="uid://crijislsb7g8g"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Working_Unit/crafting_desk_job.gd" id="1_kmuxq"]
+[ext_resource type="Texture2D" uid="uid://c7anhgn2t24im" path="res://GAME/assets/sprites/cards/cardbase.png" id="3_sc45g"]
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_6d3gt"]
+
+[node name="WorkUnitJob" type="Control"]
+z_index = 100
+z_as_relative = false
+layout_mode = 3
+anchor_right = 0.123792
+anchor_bottom = 0.216704
+offset_right = -0.68
+offset_bottom = -0.0400085
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_kmuxq")
+job_slot_root_path = NodePath("Job slot root")
+output_slot_path = NodePath("Output")
+craft_button_path = NodePath("Panel/Button")
+spawn_parent_path = "res://GAME/scenes/2D/Main.tscn"
+debug_log = true
+metadata/_edit_use_anchors_ = true
+
+[node name="Shadow" type="TextureRect" parent="."]
+modulate = Color(0, 0, 0, 1)
+self_modulate = Color(0, 0, 0, 0.25098)
+layout_mode = 0
+offset_right = 248.0
+offset_bottom = 249.0
+mouse_filter = 2
+texture = ExtResource("3_sc45g")
+expand_mode = 1
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = -1
+offset_right = 236.0
+offset_bottom = 233.0
+mouse_filter = 2
+color = Color(0.346489, 0.200682, 0.0927007, 1)
+
+[node name="Panel" type="NinePatchRect" parent="."]
+layout_mode = 0
+offset_right = 237.0
+offset_bottom = 233.0
+
+[node name="RightSlotWrap" type="Label" parent="Panel"]
+layout_mode = 2
+offset_left = 5.0
+offset_top = 78.0
+offset_right = 6.0
+offset_bottom = 100.333
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Dropcard" type="TextureRect" parent="Panel/RightSlotWrap"]
+modulate = Color(0.514563, 0.309973, 0.161327, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_top = -0.537448
+anchor_right = 46.0
+anchor_bottom = 2.14955
+offset_top = 0.00300121
+offset_bottom = -0.00667191
+texture = SubResource("CanvasTexture_6d3gt")
+metadata/_edit_use_anchors_ = true
+
+[node name="Dropcard2" type="TextureRect" parent="Panel/RightSlotWrap"]
+modulate = Color(0.514563, 0.309973, 0.161327, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 80.0
+anchor_top = -0.537448
+anchor_right = 126.0
+anchor_bottom = 2.14955
+offset_top = 0.00300121
+offset_bottom = -0.00667191
+texture = SubResource("CanvasTexture_6d3gt")
+metadata/_edit_use_anchors_ = true
+
+[node name="Output" type="TextureRect" parent="Panel/RightSlotWrap"]
+modulate = Color(0.514563, 0.309973, 0.161327, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 178.0
+anchor_top = 3.89539
+anchor_right = 224.0
+anchor_bottom = 6.58239
+offset_top = 0.00300121
+offset_bottom = -0.00667191
+texture = SubResource("CanvasTexture_6d3gt")
+metadata/_edit_use_anchors_ = true
+
+[node name="Dropcard3" type="TextureRect" parent="Panel/RightSlotWrap"]
+modulate = Color(0.514563, 0.309973, 0.161327, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 5.0
+anchor_top = 3.40285
+anchor_right = 51.0
+anchor_bottom = 6.08985
+offset_top = 0.00300121
+offset_bottom = -0.00667191
+texture = SubResource("CanvasTexture_6d3gt")
+metadata/_edit_use_anchors_ = true
+
+[node name="Dropcard4" type="TextureRect" parent="Panel/RightSlotWrap"]
+modulate = Color(0.514563, 0.309973, 0.161327, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 83.0
+anchor_top = 3.22375
+anchor_right = 129.0
+anchor_bottom = 5.91074
+offset_top = 0.00300121
+offset_bottom = -0.00667191
+texture = SubResource("CanvasTexture_6d3gt")
+metadata/_edit_use_anchors_ = true
+
+[node name="Dropcard5" type="TextureRect" parent="Panel/RightSlotWrap"]
+modulate = Color(0.514563, 0.309973, 0.161327, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 172.0
+anchor_top = -0.537448
+anchor_right = 218.0
+anchor_bottom = 2.14955
+offset_top = 0.00300121
+offset_bottom = -0.00667191
+texture = SubResource("CanvasTexture_6d3gt")
+metadata/_edit_use_anchors_ = true
+
+[node name="Button" type="Button" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.257
+anchor_right = 0.759
+anchor_bottom = 0.155
+offset_left = 0.0909996
+offset_top = 1.0
+offset_right = 0.116989
+offset_bottom = -0.115002
+text = "Craft"
+
+[node name="Job slot root" type="Node2D" parent="."]
+
+[node name="Job 1" type="Node2D" parent="Job slot root"]
+position = Vector2(27, 97)
+
+[node name="Job 2" type="Node2D" parent="Job slot root"]
+position = Vector2(108, 96)
+
+[node name="Job 3" type="Node2D" parent="Job slot root"]
+position = Vector2(32, 188)
+
+[node name="Job 4" type="Node2D" parent="Job slot root"]
+position = Vector2(113, 179)
+
+[node name="Job 5" type="Node2D" parent="Job slot root"]
+position = Vector2(198, 93)
+
+[node name="Output" type="Node2D" parent="."]
+position = Vector2(206, 194)

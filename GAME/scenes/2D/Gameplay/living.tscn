@@ -1,0 +1,59 @@
+[gd_scene load_steps=6 format=3 uid="uid://cpktxp6harx1a"]
+
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Living/living.gd" id="1_vh48y"]
+[ext_resource type="Texture2D" uid="uid://d3bcmsbpe3qhi" path="res://GAME/assets/sprites/cards/1.2 Poker cards/80_1.2 Poker cards.png" id="2_odhp5"]
+[ext_resource type="Script" path="res://GAME/scripts/Gameplay/Living/living_animation.gd" id="3_yfn4k"]
+[ext_resource type="Texture2D" uid="uid://vgoauvydgq54" path="res://GAME/assets/sprites/cards/pngegg.png" id="4_5xg0e"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0e13w"]
+size = Vector2(103, 128)
+
+[node name="Living" type="Node2D"]
+script = ExtResource("1_vh48y")
+sprite_path = NodePath("Dial Face")
+time_spent = 10.0
+
+[node name="Dial Face" type="Sprite2D" parent="."]
+position = Vector2(28.5, 34)
+scale = Vector2(2.2766, 2.09375)
+texture = ExtResource("2_odhp5")
+
+[node name="hit_full" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="hit_full"]
+position = Vector2(28.5, 33)
+shape = SubResource("RectangleShape2D_0e13w")
+
+[node name="NameLabel" type="Label" parent="."]
+z_index = 4096
+anchors_preset = -1
+anchor_left = -0.012
+anchor_top = -0.029
+anchor_right = 0.013
+offset_left = -23.0
+offset_top = -31.0
+offset_right = -22.0
+offset_bottom = -8.66667
+size_flags_horizontal = 0
+size_flags_vertical = 0
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Living Animation" type="Node2D" parent="."]
+script = ExtResource("3_yfn4k")
+face_path = NodePath("../Dial Face")
+pointer_path = NodePath("../Pointer")
+use_step_ticks = true
+tick_steps = 96
+
+[node name="Dial Pointer" type="Sprite2D" parent="."]
+position = Vector2(16, 15)
+scale = Vector2(0.1, 0.1)
+
+[node name="Pointer" type="Node2D" parent="."]
+position = Vector2(29, 34)
+
+[node name="Pointer" type="Sprite2D" parent="Pointer"]
+position = Vector2(0, -24)
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("4_5xg0e")

@@ -1,14 +1,17 @@
-[gd_scene load_steps=5 format=3 uid="uid://utdjd6rbipxo"]
+[gd_scene load_steps=7 format=3 uid="uid://utdjd6rbipxo"]
 
 [ext_resource type="Script" path="res://GAME/scripts/Working_Unit/work_unit_base.gd" id="1_jpqrt"]
 [ext_resource type="PackedScene" uid="uid://clx6jar13lxij" path="res://GAME/scenes/2D/Working_Unit/work_unit_job.tscn" id="2_jjhn3"]
 [ext_resource type="Texture2D" uid="uid://d3bcmsbpe3qhi" path="res://GAME/assets/sprites/cards/1.2 Poker cards/80_1.2 Poker cards.png" id="2_ynqg3"]
+[ext_resource type="Script" path="res://GAME/scripts/Working_Unit/work_unit_producer.gd" id="4_4g2wo"]
+[ext_resource type="PackedScene" uid="uid://beh130qc12obq" path="res://GAME/scenes/2D/cards/Crafting material/common/card_base_ai.tscn" id="5_0a61y"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1hf2g"]
 size = Vector2(103, 128)
 
 [node name="Work Unit Base" type="Node2D"]
 script = ExtResource("1_jpqrt")
+grid_manager_path = NodePath(".")
 pickup_scale = 2.0
 job_open_trans = 9
 job_open_ease = 2
@@ -46,3 +49,16 @@ size_flags_horizontal = 0
 size_flags_vertical = 0
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="work unit produce" type="Node2D" parent="."]
+script = ExtResource("4_4g2wo")
+work_unit_base_path = NodePath("..")
+job_node_path = null
+spawn_parent_path = null
+card_scene = ExtResource("5_0a61y")
+output_card_name = null
+produce_interval = null
+loop_produce = null
+auto_start = null
+spawn_offset = null
+debug_log = null

@@ -76,16 +76,6 @@ text = "N e w    G a m e"
 flat = true
 alignment = 0
 script = ExtResource("2_8p56p")
-amplitude_min = 0.5
-amplitude_max = 4.5
-speed_min = 0.6
-speed_max = 1.7
-random_seed = 7
-normal_color = Color(0.929412, 0.898039, 0.815686, 1)
-hover_color = Color(0.909804, 0.8, 0.356863, 1)
-color_tween_time = 0.5
-fade_out_color = Color(0.313726, 0.113725, 0, 0.913725)
-fade_out_ease = 1
 metadata/_edit_use_anchors_ = true
 
 [node name="Setting" type="Button" parent="VBoxContainer"]

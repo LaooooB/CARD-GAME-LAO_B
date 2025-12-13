@@ -1,12 +1,13 @@
 # CardPack.gd —— 自动找 GridManager、自动命中区、拖拽/点击
-# 点击后：从 card_blueprints.json 随机生成 3 张 {grass/stone/wood}，成功再消失（可调 Tween）
+# 点击后：从 card_blueprints.json 随机生成若干张卡牌（按 spawn_card_names 过滤），成功再消失（可调 Tween）
 extends Node2D
 class_name CardPack
+
 
 @export var sprite_path: NodePath = ^"Sprite2D"
 @export var hit_full_path: NodePath = ^"hit_full"
 
-# —— 拖拽/点击基础 ——
+# —— 拖拽/点击基础 —— 
 @export var pickup_scale: float = 1.06
 @export var drag_z: int = 8999
 @export_range(0.0, 20.0, 0.5) var click_px_threshold: float = 6.0
@@ -32,7 +33,7 @@ class_name CardPack
 @export var spawn_tween_trans: Tween.TransitionType = Tween.TRANS_QUAD
 @export var spawn_tween_ease: Tween.EaseType = Tween.EASE_OUT
 
-# —— 点击后消失 Tween ——（只有生成成功才消失）
+# —— 点击后消失 Tween ——（只有生成成功才消失）——
 @export var vanish_on_click: bool = true
 @export_range(0.01, 2.0, 0.01) var vanish_duration: float = 0.18
 @export var vanish_transition: Tween.TransitionType = Tween.TRANS_QUAD
@@ -40,7 +41,7 @@ class_name CardPack
 @export_range(0.2, 1.5, 0.01) var vanish_end_scale: float = 0.85
 @export_range(0.0, 1.0, 0.01) var vanish_end_alpha: float = 0.0
 
-# —— 新增：回弹到原格子 的动效参数 ——
+# —— 回弹到原格子 的动效参数 —— 
 @export_range(0.05, 1.0, 0.01) var bounce_back_duration: float = 0.20
 @export var bounce_trans: Tween.TransitionType = Tween.TRANS_BACK
 @export var bounce_ease: Tween.EaseType = Tween.EASE_OUT
@@ -65,11 +66,13 @@ var _press_pos_screen: Vector2 = Vector2.ZERO
 var _press_time_ms: int = 0
 var _pressing: bool = false
 
-# —— 索引：CARD_NAME(lower) → row(dict，含 SCENE_PATH 等) ——
+# —— 索引：CARD_NAME(lower) → row(dict，含 SCENE_PATH 等) —— 
 var _by_card_name: Dictionary = {}   # key: String(lowercase), value: Dictionary
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
+
 func _ready() -> void:
+	_rng.randomize()
 	_normalize_or_warn_weights()
 
 	_grid = _find_grid_manager()
@@ -106,7 +109,9 @@ func _ready() -> void:
 	set_process_input(true)
 	set_process_unhandled_input(false)
 
+
 # ---------- 自动查找 GridManager ----------
+
 func _find_grid_manager() -> Node:
 	var cs: Node = get_tree().current_scene
 	if cs:
@@ -116,21 +121,27 @@ func _find_grid_manager() -> Node:
 		n = cs.find_child("GridManager", true, false)
 		if n != null and _is_valid_grid(n):
 			return n
+
 	for g in ["grid_manager", "snap_manager"]:
 		for node in get_tree().get_nodes_in_group(g):
 			if _is_valid_grid(node):
 				return node
+
 	var root: Viewport = get_tree().get_root()
 	var cand: Node = root.find_child("GridManager", true, false)
 	if cand != null and _is_valid_grid(cand):
 		return cand
+
 	var q: Node = _dfs_find_by_method(root, "drop_pack")
 	if q != null:
 		return q
+
 	return null
+
 
 func _is_valid_grid(n: Node) -> bool:
 	return n != null and is_instance_valid(n) and (n.has_method("drop_pack") or n.has_method("drop_card"))
+
 
 func _dfs_find_by_method(start: Node, method_name: String) -> Node:
 	if start != null and start.has_method(method_name):
@@ -142,11 +153,14 @@ func _dfs_find_by_method(start: Node, method_name: String) -> Node:
 			return r
 	return null
 
+
 # ---------- 命中区自动创建 ----------
+
 func _ensure_hit_area_from_sprite() -> Area2D:
 	var a: Area2D = Area2D.new()
 	a.name = "hit_full"
 	add_child(a)
+
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	a.add_child(shape)
 
@@ -156,18 +170,23 @@ func _ensure_hit_area_from_sprite() -> Area2D:
 		var tex_size: Vector2 = _sprite.texture.get_size()
 		var scl: Vector2 = _sprite.scale
 		size_px = tex_size * scl
+
 	rect.size = size_px
 	shape.shape = rect
 	shape.position = Vector2.ZERO
+
 	a.input_pickable = true
 	a.monitoring = true
 	return a
 
+
 # ---------- 交互开关 ----------
+
 func set_interaction_enabled(enabled: bool) -> void:
 	_interaction_enabled = enabled
 	if not enabled and _dragging:
 		cancel_drag()
+
 
 func set_hit_area_enabled(full_enabled: bool) -> void:
 	if _hit_full:
@@ -175,7 +194,9 @@ func set_hit_area_enabled(full_enabled: bool) -> void:
 		_hit_full.input_pickable = full_enabled
 		_hit_full.visible = full_enabled
 
+
 # ---------- 主循环 ----------
+
 func _process(_delta: float) -> void:
 	if _dragging:
 		var mouse_g: Vector2 = get_global_mouse_position()
@@ -183,9 +204,12 @@ func _process(_delta: float) -> void:
 		_follow_to(target)
 		emit_signal("drag_moved", self, mouse_g)
 
+
 func _input(event: InputEvent) -> void:
 	# 鼠标抬起：结束拖拽 + 点击 → 生成 → 成功后消失
-	if event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT and not (event as InputEventMouseButton).pressed:
+	if event is InputEventMouseButton \
+	and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT \
+	and not (event as InputEventMouseButton).pressed:
 		if _dragging:
 			_end_drag_and_drop()
 		if _pressing:
@@ -196,24 +220,32 @@ func _input(event: InputEvent) -> void:
 				await _spawn_then_vanish_if_success()
 		return
 
-	# 兜底命中
-	if _hit_full == null and event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT and (event as InputEventMouseButton).pressed:
+	# 兜底命中（没有 hit_full 时）
+	if _hit_full == null \
+	and event is InputEventMouseButton \
+	and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT \
+	and (event as InputEventMouseButton).pressed:
 		if _is_mouse_over_sprite():
 			_pressing = true
 			_press_pos_screen = get_viewport().get_mouse_position()
 			_press_time_ms = Time.get_ticks_msec()
 			begin_drag()
 
+
 func _on_hit_full_input(_vp: Node, event: InputEvent, _shape_idx: int) -> void:
 	if not _interaction_enabled:
 		return
-	if event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT and (event as InputEventMouseButton).pressed:
+	if event is InputEventMouseButton \
+	and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT \
+	and (event as InputEventMouseButton).pressed:
 		_pressing = true
 		_press_pos_screen = get_viewport().get_mouse_position()
 		_press_time_ms = Time.get_ticks_msec()
 		begin_drag()
 
+
 # ---------- 拖拽 ----------
+
 func begin_drag() -> void:
 	if _dragging or not _interaction_enabled:
 		return
@@ -234,9 +266,11 @@ func begin_drag() -> void:
 
 	var mouse_g: Vector2 = get_global_mouse_position()
 	_drag_offset = mouse_g - global_position
+
 	if debug_log:
 		print("[CardPack] drag_started")
 	emit_signal("drag_started", self)
+
 
 func _end_drag_and_drop() -> void:
 	if not _dragging:
@@ -255,11 +289,13 @@ func _end_drag_and_drop() -> void:
 	if debug_log:
 		print("[CardPack] drop accepted? ", accepted)
 
+
 func cancel_drag() -> void:
 	if _dragging:
 		_dragging = false
 		emit_signal("drag_ended", self)
 	_restore_visual_post_drop(false)
+
 
 func _follow_to(target_global: Vector2) -> void:
 	if _anim != null and _anim.has_method("follow_immediate"):
@@ -267,14 +303,17 @@ func _follow_to(target_global: Vector2) -> void:
 	else:
 		global_position = target_global
 
+
 func _restore_visual_post_drop(_accepted: bool) -> void:
 	scale = _orig_scale
 	z_index = _orig_z
 	z_as_relative = _orig_zrel
 
+
 # =========================
 # ===== 生成 & 消失 ======
 # =========================
+
 func _spawn_then_vanish_if_success() -> void:
 	set_interaction_enabled(false)
 
@@ -293,7 +332,7 @@ func _spawn_then_vanish_if_success() -> void:
 				free = 0
 			else:
 				free = requested
-		
+
 		free = max(free, 0)
 		allowed = min(requested, free)
 
@@ -332,6 +371,7 @@ func _vanish_now() -> void:
 	await tw.finished
 	queue_free()
 
+
 # 返回成功生成的数量
 func _spawn_cards_from_blueprints(count: int, allowed_names: PackedStringArray) -> int:
 	if _by_card_name.is_empty():
@@ -339,7 +379,7 @@ func _spawn_cards_from_blueprints(count: int, allowed_names: PackedStringArray) 
 			push_warning("[CardPack] blueprint index empty; file missing/parse empty?")
 		return 0
 
-	# —— 构造候选与权重 ——
+	# —— 构造候选与权重 —— 
 	var cw: Dictionary = _build_candidates_and_weights(allowed_names)
 	var candidates: Array[String] = cw["names"]
 	var weights: Array[float] = cw["weights"]
@@ -366,7 +406,9 @@ func _spawn_cards_from_blueprints(count: int, allowed_names: PackedStringArray) 
 		print("[CardPack] spawned=", ok, "/", count, "  candidates=", candidates, "  weights=", weights)
 	return ok
 
-# 需要 4 个参数：最后一个是 row（从 blueprints 里挑出来那一行）
+
+# ========= 关键：按 row + CARD_NAME 生成单张卡，并配合新版 CardFactory =========
+
 func _spawn_one_card(scene_path: String, idx: int, total: int, row: Dictionary) -> bool:
 	var ps: Resource = load(scene_path)
 	if ps == null or not (ps is PackedScene):
@@ -378,42 +420,43 @@ func _spawn_one_card(scene_path: String, idx: int, total: int, row: Dictionary) 
 	if inst == null:
 		return false
 
-	# 先入树
+	var card_name: String = str(row.get("CARD_NAME", "")).strip_edges()
+	if card_name == "":
+		if debug_log:
+			push_warning("[CardPack] row missing CARD_NAME for SCENE_PATH=" + scene_path)
+		return false
+
+	# —— 先在进树之前，把名字和 row 写到 meta（配合新版 CardFactory 的 _resolve_row_for_node 优先级）——
+	inst.set_meta("CARD_NAME", card_name)
+	inst.set_meta("card_row", row)
+	inst.name = card_name
+
+	# 加入场景树（这一步会触发 CardFactory.auto_apply_on_node_added → apply_to）
 	get_parent().add_child(inst)
 
-	# 放位置（略）
+	# 设置位置（散射）
 	if inst is Node2D:
 		var angle: float = TAU * (float(idx) / max(1.0, float(total))) + _rng.randf_range(-0.5, 0.5)
 		var offset: Vector2 = Vector2(cos(angle), sin(angle)) * spawn_scatter
 		(inst as Node2D).global_position = global_position + offset
 
-	# ✅ 只通过 /root/CardFactory 获取 AutoLoad；并且仅按名字贴数据，避免 scene 覆盖
+	# 再显式调用一次按名字贴数据，确保与 CardFactory 保持一致（即使 auto_apply 关闭也能正常）
 	var cf: Node = _get_card_factory()
-	var card_name := str(row.get("CARD_NAME", "")).strip_edges()
 	if cf != null and card_name != "":
-		# 元数据双保险（有的流程会从 meta 读取）
-		inst.set_meta("CARD_NAME", card_name)
 		if debug_log:
-			print("[Pack] apply_by_name -> ", card_name)
-
-		if cf.has_method("apply_spawned"):
-			cf.call("apply_spawned", inst, card_name)
-		elif cf.has_method("apply_by_name"):
+			print("[CardPack] apply_by_name -> ", card_name)
+		if cf.has_method("apply_by_name"):
 			cf.call("apply_by_name", inst, card_name)
-		elif cf.has_method("apply_card"):
-			# 只传名字，避免其内部再用 scene_path 做匹配
-			cf.call("apply_card", inst, {"CARD_NAME": card_name})
-	else:
-		if debug_log:
-			print("[Pack] NO CardFactory at /root/CardFactory or empty name")
+		elif cf.has_method("apply_to"):
+			cf.call("apply_to", inst)
 
-	# 可选淡入（略）
 	return true
 
 
 # =========================
 # ===== JSON 解析 ========
 # =========================
+
 func _build_blueprint_index() -> void:
 	_by_card_name.clear()
 
@@ -421,9 +464,10 @@ func _build_blueprint_index() -> void:
 	var bp: Variant = _read_json_any(blueprints_path)
 	_parse_blueprints_into_index(bp, _by_card_name)
 
-	# 2) 可选：若需要用 registry 做补全（此处不强依赖）
+	# 如果你想用 registry 做补全，可以在这里再读一次 registry_path
 	# var rg: Variant = _read_json_any(registry_path)
-	# _parse_blueprints_into_index(rg, _by_card_name, false) # 仅补缺
+	# _parse_blueprints_into_index(rg, _by_card_name, false)
+
 
 func _parse_blueprints_into_index(data: Variant, dst: Dictionary, override_existing: bool = true) -> void:
 	if data == null:
@@ -440,19 +484,20 @@ func _parse_blueprints_into_index(data: Variant, dst: Dictionary, override_exist
 		if dict_data.has("cards") and typeof(dict_data["cards"]) == TYPE_ARRAY:
 			_parse_rows_array(dict_data["cards"] as Array, dst, override_existing)
 		else:
-			# flat dict
 			for k in dict_data.keys():
 				var row_variant: Variant = dict_data[k]
 				if typeof(row_variant) == TYPE_DICTIONARY:
 					_add_row(dict_data[k] as Dictionary, dst, override_existing)
+
 
 func _parse_rows_array(arr: Array, dst: Dictionary, override_existing: bool) -> void:
 	for row_var in arr:
 		if typeof(row_var) == TYPE_DICTIONARY:
 			_add_row(row_var as Dictionary, dst, override_existing)
 
+
 func _add_row(row: Dictionary, dst: Dictionary, override_existing: bool) -> void:
-	# —— 严格字段名：CARD_NAME 与 SCENE_PATH 必填；其他字段按原样保留 ——
+	# —— 严格字段名：CARD_NAME 与 SCENE_PATH 必填；其他字段按原样保留 —— 
 	var card_name_s: String = str(row.get("CARD_NAME", ""))
 	var scene_path_s: String = str(row.get("SCENE_PATH", ""))
 
@@ -462,49 +507,63 @@ func _add_row(row: Dictionary, dst: Dictionary, override_existing: bool) -> void
 	var key: String = card_name_s.to_lower()
 	if not override_existing and dst.has(key):
 		return
+
 	dst[key] = row.duplicate(true)
+
 
 func _read_json_any(path: String) -> Variant:
 	if path == "" or not FileAccess.file_exists(path):
 		if debug_log:
 			push_warning("[CardPack] file not found: %s" % path)
 		return null
+
 	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		if debug_log:
 			push_warning("[CardPack] cannot open: %s" % path)
 		return null
+
 	var txt: String = f.get_as_text()
 	f.close()
+
 	var parsed: Variant = JSON.parse_string(txt)
 	if parsed == null:
 		if debug_log:
 			push_warning("[CardPack] json parse failed: %s" % path)
 	return parsed
 
+
 # ---------- 命中兜底 ----------
+
 func _is_mouse_over_sprite() -> bool:
 	if _sprite == null or _sprite.texture == null:
 		return false
+
 	var tex_size: Vector2 = _sprite.texture.get_size()
 	if tex_size == Vector2.ZERO:
 		return false
+
 	var center: Vector2 = _sprite.global_position
 	var scl: Vector2 = _sprite.global_scale
 	var half: Vector2 = tex_size * 0.5 * scl
 	var mouse_g: Vector2 = get_global_mouse_position()
+
 	if absf(_sprite.global_rotation) < 0.001:
 		var rect: Rect2 = Rect2(center - half, half * 2.0)
 		return rect.has_point(mouse_g)
+
 	var xf: Transform2D = _sprite.get_global_transform().affine_inverse()
 	var local: Vector2 = xf * mouse_g
 	var local_half: Vector2 = tex_size * 0.5
 	return Rect2(-local_half, tex_size).has_point(local)
 
+
 # ---------- 对齐到格中心（若找不到格子则不动） ----------
+
 func _snap_to_grid_center() -> void:
 	if _grid == null or not is_instance_valid(_grid):
 		return
+
 	var center: Vector2 = global_position
 	if _grid.has_method("world_to_cell_center"):
 		center = _grid.call("world_to_cell_center", global_position)
@@ -513,6 +572,7 @@ func _snap_to_grid_center() -> void:
 			var cell: int = int(_grid.call("_world_to_cell_idx", global_position))
 			if cell != -1:
 				center = _grid.call("get_cell_pos", cell)
+
 	if _anim != null and _anim.has_method("tween_to"):
 		_anim.call("tween_to", center, 0.12, 1.0)
 		await get_tree().create_timer(0.12).timeout
@@ -521,7 +581,9 @@ func _snap_to_grid_center() -> void:
 		tw.tween_property(self, "global_position", center, 0.12)
 		await tw.finished
 
-# ---------- 新增：计算当前所在格子的中心（不移动，仅返回） ----------
+
+# ---------- 计算当前所在格子的中心（不移动，仅返回） ----------
+
 func _get_current_cell_center_global() -> Vector2:
 	var center: Vector2 = global_position
 	if _grid != null and is_instance_valid(_grid):
@@ -533,7 +595,9 @@ func _get_current_cell_center_global() -> Vector2:
 				center = _grid.call("get_cell_pos", cell)
 	return center
 
-# ---------- 新增：提供给 SellingArea 的公共回弹接口 ----------
+
+# ---------- 提供给 SellingArea 的公共回弹接口 ----------
+
 func snap_back_to_grid() -> void:
 	# 优先：记录的原格中心
 	if has_meta("pre_drag_cell_center"):
@@ -544,6 +608,7 @@ func snap_back_to_grid() -> void:
 			t1.set_ease(bounce_ease)
 			t1.tween_property(self, "global_position", (v as Vector2), bounce_back_duration)
 			return
+
 	# 次优：拖拽前全局坐标
 	if has_meta("pre_drag_global_pos"):
 		var p: Variant = get_meta("pre_drag_global_pos")
@@ -553,7 +618,8 @@ func snap_back_to_grid() -> void:
 			t2.set_ease(bounce_ease)
 			t2.tween_property(self, "global_position", (p as Vector2), bounce_back_duration)
 			return
-	# 兜底：如果两者都没有，就立即对齐到当前格中心（不会突兀）
+
+	# 兜底：如果两者都没有，就立即对齐到当前格中心
 	var now_center: Vector2 = _get_current_cell_center_global()
 	if (now_center - global_position).length() > 1.0:
 		var t3: Tween = create_tween()
@@ -561,7 +627,9 @@ func snap_back_to_grid() -> void:
 		t3.set_ease(bounce_ease)
 		t3.tween_property(self, "global_position", now_center, bounce_back_duration)
 
-# 构造候选集合与权重；allowed_names 为空则取 _by_card_name 的全部键
+
+# ---------- 候选集合与权重 ----------
+
 func _build_candidates_and_weights(allowed_names: PackedStringArray) -> Dictionary:
 	var candidates: Array[String] = []
 	if allowed_names.is_empty():
@@ -573,20 +641,18 @@ func _build_candidates_and_weights(allowed_names: PackedStringArray) -> Dictiona
 			if _by_card_name.has(key):
 				candidates.append(key)
 
-	# 组装与校正权重
 	var weights: Array[float] = []
 	if spawn_card_weights.size() == candidates.size() and candidates.size() > 0:
 		for i in range(candidates.size()):
 			var w: float = float(spawn_card_weights[i])
 			weights.append(max(w, 0.0))
 	else:
-		# 长度不匹配或为空 → 均分
 		if candidates.size() > 0:
 			var p: float = 1.0 / float(candidates.size())
 			for _i in range(candidates.size()):
 				weights.append(p)
 
-	# 归一（安全起见在运行时再保证一次）
+	# 归一
 	var s: float = 0.0
 	for w in weights:
 		s += w
@@ -600,7 +666,7 @@ func _build_candidates_and_weights(allowed_names: PackedStringArray) -> Dictiona
 
 	return {"names": candidates, "weights": weights}
 
-# 权重随机选一个索引（weights 已经归一化）
+
 func _pick_weighted(weights: Array[float]) -> int:
 	var r: float = _rng.randf()
 	var acc: float = 0.0
@@ -610,8 +676,8 @@ func _pick_weighted(weights: Array[float]) -> int:
 			return i
 	return max(0, weights.size() - 1)
 
+
 func _normalize_or_warn_weights() -> void:
-	# 仅在你明确填了名单与权重时做检查
 	if spawn_card_names.size() > 0 and spawn_card_weights.size() > 0:
 		if spawn_card_weights.size() != spawn_card_names.size():
 			push_warning("[CardPack] spawn_card_weights size != spawn_card_names size; will auto-even at runtime.")
@@ -626,18 +692,20 @@ func _normalize_or_warn_weights() -> void:
 			for i in range(spawn_card_weights.size()):
 				spawn_card_weights[i] = float(spawn_card_weights[i]) / s
 
+
 # =========================
 # ===== 私有工具函数 =====
 # =========================
+
 func _get_card_factory() -> Node:
-	# 只通过 AutoLoad 节点名获取，不再使用 Engine.has_singleton
-	var root := get_tree().get_root()
+	var root: Node = get_tree().get_root()
 	if root.has_node(^"/root/CardFactory"):
 		return root.get_node(^"/root/CardFactory")
 	return null
 
+
 func _get_card_limit_manager() -> Node:
-	var root := get_tree().get_root()
+	var root: Node = get_tree().get_root()
 	if root.has_node(^"/root/CardLimitManager"):
 		return root.get_node(^"/root/CardLimitManager")
 	return null
